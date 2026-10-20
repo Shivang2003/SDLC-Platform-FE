@@ -4,11 +4,11 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { signupUser } from "../api/authService";
+import { signupUser } from "../services/authService";
 
 const schema = z.object({
   userName: z.string().min(3, "Username must be at least 3 characters"),
-  email: z.string().email("Enter a valid email address"),
+  email: z.email("Enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 

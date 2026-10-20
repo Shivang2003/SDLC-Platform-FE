@@ -1,30 +1,37 @@
-
 import { create } from "zustand";
-
-const getInitialToken = () => localStorage.getItem("accessToken");
+import api from "../lib/axios";
 
 export const useAuthStore = create((set) => ({
-  token: getInitialToken(),
+  isAuthenticated: false,
+  isCheckingAuth: true,
+  user: null,
 
-  login: (token) => {
-    localStorage.setItem("accessToken", token);
-    set({ token });
-  },
+  login: () => set({
+    isAuthenticated: true,
+    isCheckingAuth: false,
+  }),
 
-  logout: () => {
-    localStorage.removeItem("accessToken");
-    set({ token: null });
+  logout: () => set({
+    isAuthenticated: false,
+    isCheckingAuth: false,
+    user: null,
+  }),
+
+  checkAuth: async () => {
+    try {
+      const response = await api.get("/user/me");
+
+      set({
+        isAuthenticated: true,
+        isCheckingAuth: false,
+        user: response.data,
+      });
+    } catch {
+      set({
+        isAuthenticated: false,
+        isCheckingAuth: false,
+        user: null,
+      });
+    }
   },
 }));
-
-if (typeof window !== "undefined") {
-  window.addEventListener("storage", (event) => {
-    if (event.key === "accessToken") {
-      useAuthStore.setState({ token: event.newValue });
-    }
-  });
-
-  window.addEventListener("auth:unauthorized", () => {
-    useAuthStore.getState().logout();
-  });
-}

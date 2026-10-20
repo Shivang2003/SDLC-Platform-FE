@@ -1,33 +1,58 @@
 
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import LoginPage from "../features/auth/pages/LoginPage";
-import SignupPage from "../features/auth/pages/SignupPage";
 import { useAuthStore } from "../stores/authStore";
 
-function OrganizationsPlaceholder() {
-  const logout = useAuthStore((state) => state.logout);
+import LoginPage from "../pages/LoginPage";
+import SignupPage from "../pages/SignupPage";
+import ProjectsPage from "../pages/ProjectsPage";
+import MainLayout from "../layouts/MainLayout";
+import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
+
+function RootRedirect() {
+  const isAuthenticated = useAuthStore(
+    (state) => state.isAuthenticated
+  );
+  const isCheckingAuth = useAuthStore(
+    (state) => state.isCheckingAuth
+  );
+
+  if (isCheckingAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50">
-      <h1 className="text-2xl font-bold text-gray-900">
-        Authentication successful
-      </h1>
-      <p className="text-gray-600">
-        Your organizations page will be built next.
-      </p>
-      <button
-        onClick={logout}
-        className="rounded-lg bg-gray-900 px-4 py-2 text-white hover:bg-gray-700"
-      >
-        Sign out
-      </button>
-    </main>
+    <Navigate
+      to={isAuthenticated ? "/projects" : "/login"}
+      replace
+    />
   );
 }
 
-function RootRedirect() {
-  const token = useAuthStore((state) => state.token);
-  return <Navigate to={token ? "/organizations" : "/login"} replace />;
+function ProtectedRoute() {
+  const isAuthenticated = useAuthStore(
+    (state) => state.isAuthenticated
+  );
+  const isCheckingAuth = useAuthStore(
+    (state) => state.isCheckingAuth
+  );
+
+  if (isCheckingAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      </div>
+    );
+  }
+
+  return isAuthenticated ? (
+    <MainLayout />
+  ) : (
+    <Navigate to="/login" replace />
+  );
 }
 
 export default function AppRouter() {
@@ -37,10 +62,22 @@ export default function AppRouter() {
         <Route path="/" element={<RootRedirect />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/sign-up" element={<SignupPage />} />
-        <Route
-          path="/organizations"
-          element={<OrganizationsPlaceholder />}
-        />
+
+        <Route element={<ProtectedRoute />}>
+  <Route
+    path="/projects"
+    element={<ProjectsEmptyState
+      title="Select an organization"
+      description="Choose an organization from the sidebar to view its projects."
+    />}
+  />
+
+  <Route
+    path="/organizations/:organizationId/projects"
+    element={<ProjectsPage />}
+  />
+</Route>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

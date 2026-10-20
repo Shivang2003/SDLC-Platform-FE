@@ -4,8 +4,8 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { loginUser } from "../api/authService";
-import { useAuthStore } from "../../../stores/authStore";
+import { loginUser } from "../services/authService";
+import { useAuthStore } from "../stores/authStore";
 
 const schema = z.object({
   userName: z.string().min(1, "Username is required"),
@@ -28,30 +28,23 @@ export default function LoginPage() {
     defaultValues: { userName: "", password: "" },
   });
 
-  const onSubmit = async (values) => {
-    try {
-      const data = await loginUser(values);
-      const token =
-        typeof data === "string"
-          ? data
-          : data.token ?? data.accessToken ?? data.jwt;
+const onSubmit = async (values) => {
+  try {
+    await loginUser(values);
 
-      if (!token) {
-        toast.error("Login response did not contain a JWT token");
-        return;
-      }
+    login();
 
-      login(token);
-      toast.success("Welcome back!");
-      navigate("/organizations", { replace: true });
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          "Unable to log in. Check your credentials."
-      );
-    }
-  };
+    toast.success("Welcome back!");
+    navigate("/organizations", { replace: true });
+  } catch (error) {
+    toast.error(
+      error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Unable to log in. Check your credentials."
+    );
+  }
+};
+
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10">
