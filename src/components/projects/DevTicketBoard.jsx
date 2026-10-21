@@ -11,6 +11,7 @@ export default function DevTicketBoard({
   pendingTicketKeys,
   dragOverStatus,
   onTicketDrop,
+  onTicketClick,
   onDragOverStatus,
   onDragLeaveStatus,
 }) {
@@ -75,6 +76,7 @@ export default function DevTicketBoard({
               onDragOver={(event) => onDragOverStatus(event, status)}
               onDragLeave={() => onDragLeaveStatus(status)}
               onDrop={(event) => onTicketDrop(event, status)}
+              onTicketClick={onTicketClick}
             />
           ))}
         </div>

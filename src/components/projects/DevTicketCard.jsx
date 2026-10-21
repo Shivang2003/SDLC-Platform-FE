@@ -1,6 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 
-export default function DevTicketCard({ ticket, isUpdating }) {
+export default function DevTicketCard({ ticket, isUpdating, onClick }) {
   return (
     <article
       draggable={!isUpdating}
@@ -8,36 +8,44 @@ export default function DevTicketCard({ ticket, isUpdating }) {
         event.dataTransfer.setData("text/plain", ticket.key);
         event.dataTransfer.effectAllowed = "move";
       }}
-      className={`rounded-lg border border-slate-200 bg-white p-4 shadow-sm ${
+      className={`rounded-lg border border-slate-200 bg-white shadow-sm ${
         isUpdating
           ? "cursor-wait opacity-60"
           : "cursor-grab active:cursor-grabbing"
       }`}
     >
-      <p className="text-xs font-semibold text-blue-700">{ticket.key}</p>
-      <h4 className="mt-2 break-words text-sm font-semibold leading-5 text-slate-800">
-        {ticket.name}
-      </h4>
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <span className="rounded bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
-          {ticket.priority}
-        </span>
-        {isUpdating && (
-          <LoaderCircle
-            size={14}
-            className="animate-spin text-blue-600"
-            aria-label="Updating ticket status"
-          />
-        )}
-        {ticket.updatedAt && (
-          <time
-            dateTime={ticket.updatedAt}
-            className="text-right text-[11px] text-slate-400"
-          >
-            {new Date(ticket.updatedAt).toLocaleDateString()}
-          </time>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={isUpdating}
+        className="block w-full rounded-lg p-4 text-left focus-visible:outline-2 focus-visible:outline-blue-500"
+        aria-label={`Open details for ${ticket.key}: ${ticket.name}`}
+      >
+        <p className="text-xs font-semibold text-blue-700">{ticket.key}</p>
+        <h4 className="mt-2 break-words text-sm font-semibold leading-5 text-slate-800">
+          {ticket.name}
+        </h4>
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <span className="rounded bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
+            {ticket.priority}
+          </span>
+          {isUpdating && (
+            <LoaderCircle
+              size={14}
+              className="animate-spin text-blue-600"
+              aria-label="Updating ticket status"
+            />
+          )}
+          {ticket.updatedAt && (
+            <time
+              dateTime={ticket.updatedAt}
+              className="text-right text-[11px] text-slate-400"
+            >
+              {new Date(ticket.updatedAt).toLocaleDateString()}
+            </time>
+          )}
+        </div>
+      </button>
     </article>
   );
 }

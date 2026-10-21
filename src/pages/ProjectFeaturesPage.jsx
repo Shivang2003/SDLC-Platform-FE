@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Layers3, LoaderCircle } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import DevTicketDetailsDialog from "../components/projects/DevTicketDetailsDialog";
 import DevTicketBoard from "../components/projects/DevTicketBoard";
 import ProjectFeaturePanel from "../components/projects/ProjectFeaturePanel";
 import {
+  getDevTicketDetails,
   getFeatureDevTickets,
   getProjectFeatures,
   updateDevTicketStatus,
@@ -28,6 +30,10 @@ export default function ProjectFeaturesPage() {
   const [ticketActionError, setTicketActionError] = useState("");
   const [pendingTicketKeys, setPendingTicketKeys] = useState(() => new Set());
   const [dragOverStatus, setDragOverStatus] = useState("");
+  const [selectedTicketKey, setSelectedTicketKey] = useState("");
+  const [ticketDetails, setTicketDetails] = useState(null);
+  const [ticketDetailsLoading, setTicketDetailsLoading] = useState(false);
+  const [ticketDetailsError, setTicketDetailsError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -44,6 +50,10 @@ export default function ProjectFeaturesPage() {
       setTicketActionError("");
       setPendingTicketKeys(new Set());
       setDragOverStatus("");
+      setSelectedTicketKey("");
+      setTicketDetails(null);
+      setTicketDetailsLoading(false);
+      setTicketDetailsError("");
 
       try {
         const featureList = await getProjectFeatures(projectId);
@@ -71,6 +81,39 @@ export default function ProjectFeaturesPage() {
       active = false;
     };
   }, [projectId]);
+
+  useEffect(() => {
+    if (!selectedTicketKey) return undefined;
+
+    let active = true;
+
+    async function loadTicketDetails() {
+      setTicketDetailsLoading(true);
+      setTicketDetailsError("");
+      setTicketDetails(null);
+
+      try {
+        const details = await getDevTicketDetails(selectedTicketKey);
+        if (active) setTicketDetails(details);
+      } catch (error) {
+        if (active) {
+          setTicketDetailsError(
+            error.response?.data?.message ||
+              error.message ||
+              "Unable to load development ticket details."
+          );
+        }
+      } finally {
+        if (active) setTicketDetailsLoading(false);
+      }
+    }
+
+    loadTicketDetails();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedTicketKey]);
 
   useEffect(() => {
     if (!selectedFeatureId) return undefined;
@@ -119,6 +162,12 @@ export default function ProjectFeaturesPage() {
   const selectedFeature = features.find(
     (feature) => feature.featureId === selectedFeatureId
   );
+
+  const handleCloseTicketDetails = useCallback(() => {
+    setSelectedTicketKey("");
+    setTicketDetails(null);
+    setTicketDetailsError("");
+  }, []);
 
   const handleTicketDrop = async (event, status) => {
     event.preventDefault();
@@ -240,10 +289,21 @@ export default function ProjectFeaturesPage() {
             pendingTicketKeys={pendingTicketKeys}
             dragOverStatus={dragOverStatus}
             onTicketDrop={handleTicketDrop}
+            onTicketClick={setSelectedTicketKey}
             onDragOverStatus={handleStatusDragOver}
             onDragLeaveStatus={handleStatusDragLeave}
           />
         </div>
+      )}
+
+      {selectedTicketKey && (
+        <DevTicketDetailsDialog
+          ticketKey={selectedTicketKey}
+          loading={ticketDetailsLoading}
+          error={ticketDetailsError}
+          details={ticketDetails}
+          onClose={handleCloseTicketDetails}
+        />
       )}
     </section>
   );
