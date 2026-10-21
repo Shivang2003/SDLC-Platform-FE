@@ -5,6 +5,7 @@ import { useAuthStore } from "../stores/authStore";
 import LoginPage from "../pages/LoginPage";
 import SignupPage from "../pages/SignupPage";
 import ProjectsPage from "../pages/ProjectsPage";
+import ProjectFeaturesPage from "../pages/ProjectFeaturesPage";
 import MainLayout from "../layouts/MainLayout";
 import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
 
@@ -64,19 +65,24 @@ export default function AppRouter() {
         <Route path="/sign-up" element={<SignupPage />} />
 
         <Route element={<ProtectedRoute />}>
-  <Route
-    path="/projects"
-    element={<ProjectsEmptyState
-      title="Select an organization"
-      description="Choose an organization from the sidebar to view its projects."
-    />}
-  />
-
-  <Route
-    path="/organizations/:organizationId/projects"
-    element={<ProjectsPage />}
-  />
-</Route>
+          <Route
+            path="/projects"
+            element={
+              <ProjectsEmptyState
+                title="Select an organization"
+                description="Choose an organization from the sidebar to view its projects."
+              />
+            }
+          />
+          <Route
+            path="/projects/:projectId"
+            element={<ProjectFeaturesPage />}
+          />
+          <Route
+            path="/organizations/:organizationId/projects"
+            element={<ProjectsPage />}
+          />
+        </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

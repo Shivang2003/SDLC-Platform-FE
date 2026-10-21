@@ -15,7 +15,9 @@ export default function ProjectGrid({ projects }) {
             key={projectId}
             project={project}
             index={index}
-            onClick={() => navigate(`/projects/${projectId}`)}
+            onClick={() =>
+              navigate(`/projects/${projectId}`, { state: { project } })
+            }
           />
         );
       })}
