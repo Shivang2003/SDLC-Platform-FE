@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { LoaderCircle, X } from "lucide-react";
+import BugTicketCard from "./BugTicketCard";
 import TestTicketCard from "./TestTicketCard";
 
-export default function DevTicketDetailsDialog({
+export default function TicketDetailsDialog({
+  ticketType,
   ticketKey,
   loading,
   error,
@@ -18,7 +20,12 @@ export default function DevTicketDetailsDialog({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const devTicket = details?.devTicket;
+  const isTestTicket = ticketType === "test";
+  const ticket = isTestTicket ? details?.testTicket : details?.devTicket;
+  const relatedTickets = isTestTicket
+    ? details?.bugTickets
+    : details?.testTickets;
+  const relatedTicketType = isTestTicket ? "Bug tickets" : "Test tickets";
 
   return (
     <div
@@ -36,13 +43,13 @@ export default function DevTicketDetailsDialog({
         <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-7">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">
-              Development ticket
+              {isTestTicket ? "Test ticket" : "Development ticket"}
             </p>
             <h2
               id="dev-ticket-dialog-title"
               className="mt-1 text-lg font-bold text-slate-900"
             >
-              {devTicket?.key ?? ticketKey}
+              {ticket?.key ?? ticketKey}
             </h2>
           </div>
           <button
@@ -68,40 +75,53 @@ export default function DevTicketDetailsDialog({
           </div>
         )}
 
-        {!loading && !error && devTicket && (
+        {!loading && !error && ticket && (
           <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <article className="overflow-y-auto border-b border-slate-200 p-5 md:border-b-0 md:border-r sm:p-7">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold text-blue-700">
-                    {devTicket.key}
+                    {ticket.key}
                   </p>
                   <h3 className="mt-2 text-xl font-bold text-slate-900">
-                    {devTicket.title}
+                    {ticket.title}
                   </h3>
                 </div>
                 <span className="rounded bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                  {devTicket.priority}
+                  {ticket.priority}
                 </span>
               </div>
 
               <p className="mt-5 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                {devTicket.description || "No description provided."}
+                {ticket.description || "No description provided."}
               </p>
 
               <dl className="mt-7 grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <dt className="text-xs font-medium text-slate-500">Status</dt>
                   <dd className="mt-1 font-semibold text-slate-800">
-                    {devTicket.status.replaceAll("_", " ")}
+                    {(isTestTicket
+                      ? ticket.executionStatus
+                      : ticket.status
+                    ).replaceAll("_", " ")}
                   </dd>
                 </div>
+                {isTestTicket && (
+                  <div>
+                    <dt className="text-xs font-medium text-slate-500">
+                      Test case status
+                    </dt>
+                    <dd className="mt-1 font-semibold text-slate-800">
+                      {ticket.testCaseStatus.replaceAll("_", " ")}
+                    </dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-xs font-medium text-slate-500">
                     Revision
                   </dt>
                   <dd className="mt-1 font-semibold text-slate-800">
-                    {devTicket.currentRevision}
+                    {ticket.currentRevision}
                   </dd>
                 </div>
                 <div>
@@ -109,7 +129,7 @@ export default function DevTicketDetailsDialog({
                     Project
                   </dt>
                   <dd className="mt-1 break-all font-semibold text-slate-800">
-                    {devTicket.projectId}
+                    {ticket.projectId}
                   </dd>
                 </div>
                 <div>
@@ -117,7 +137,7 @@ export default function DevTicketDetailsDialog({
                     Feature
                   </dt>
                   <dd className="mt-1 break-all font-semibold text-slate-800">
-                    {devTicket.featureId}
+                    {ticket.featureId}
                   </dd>
                 </div>
               </dl>
@@ -133,22 +153,33 @@ export default function DevTicketDetailsDialog({
                     id="test-tickets-heading"
                     className="text-base font-bold text-slate-900"
                   >
-                    Test tickets
+                    {relatedTicketType}
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    {details.testTickets.length}{" "}
-                    {details.testTickets.length === 1 ? "test" : "tests"}
+                    {relatedTickets.length}{" "}
+                    {relatedTickets.length === 1 ? "ticket" : "tickets"}
                   </p>
                 </div>
               </div>
 
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-                {details.testTickets.map((ticket) => (
-                  <TestTicketCard key={ticket.key} ticket={ticket} />
-                ))}
-                {details.testTickets.length === 0 && (
+                {relatedTickets.map((relatedTicket) =>
+                  isTestTicket ? (
+                    <BugTicketCard
+                      key={relatedTicket.key}
+                      ticket={relatedTicket}
+                    />
+                  ) : (
+                    <TestTicketCard
+                      key={relatedTicket.key}
+                      ticket={relatedTicket}
+                    />
+                  )
+                )}
+                {relatedTickets.length === 0 && (
                   <p className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                    No test tickets are linked to this development ticket.
+                    No {isTestTicket ? "bug" : "test"} tickets are linked to
+                    this ticket.
                   </p>
                 )}
               </div>

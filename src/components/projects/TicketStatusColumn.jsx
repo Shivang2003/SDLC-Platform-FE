@@ -1,6 +1,6 @@
-import DevTicketCard from "./DevTicketCard";
+import TicketCard from "./TicketCard";
 
-export default function DevTicketStatusColumn({
+export default function TicketStatusColumn({
   status,
   tickets,
   pendingTicketKeys,
@@ -33,11 +33,15 @@ export default function DevTicketStatusColumn({
       </div>
       <div className="flex min-h-36 flex-col gap-3">
         {tickets.map((ticket) => (
-          <DevTicketCard
+          <TicketCard
             key={ticket.key}
             ticket={ticket}
             isUpdating={pendingTicketKeys.has(ticket.key)}
-            onClick={onTicketClick ? () => onTicketClick(ticket.key) : undefined}
+            onClick={
+              onTicketClick
+                ? () => onTicketClick(ticket.key, ticketType)
+                : undefined
+            }
             ticketType={ticketType}
           />
         ))}

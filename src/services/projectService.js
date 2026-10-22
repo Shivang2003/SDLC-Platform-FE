@@ -94,3 +94,19 @@ export const getDevTicketDetails = async (ticketKey) => {
 
   throw new Error("Unexpected response while loading development ticket details.");
 };
+
+export const getTestTicketDetails = async (ticketKey) => {
+  const response = await api.get(
+    `/test-ticket/${encodeURIComponent(ticketKey)}/details`
+  );
+  const data = response.data;
+
+  if (
+    data?.testTicket &&
+    Array.isArray(data.bugTickets)
+  ) {
+    return data;
+  }
+
+  throw new Error("Unexpected response while loading test ticket details.");
+};

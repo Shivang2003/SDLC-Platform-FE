@@ -1,7 +1,7 @@
 import { LoaderCircle } from "lucide-react";
-import DevTicketStatusColumn from "./DevTicketStatusColumn";
+import TicketStatusColumn from "./TicketStatusColumn";
 
-export default function DevTicketBoard({
+export default function TicketBoard({
   ticketType,
   featureName,
   statuses,
@@ -68,7 +68,7 @@ export default function DevTicketBoard({
       {!loading && !error && statuses.length > 0 && (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {statuses.map((status) => (
-            <DevTicketStatusColumn
+            <TicketStatusColumn
               key={status}
               status={status}
               tickets={tickets.filter((ticket) => ticket.status === status)}

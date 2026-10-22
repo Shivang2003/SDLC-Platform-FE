@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Layers3, LoaderCircle } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import DevTicketDetailsDialog from "../components/projects/DevTicketDetailsDialog";
-import DevTicketBoard from "../components/projects/DevTicketBoard";
+import TicketDetailsDialog from "../components/projects/TicketDetailsDialog";
+import TicketBoard from "../components/projects/TicketBoard";
 import ProjectFeaturePanel from "../components/projects/ProjectFeaturePanel";
 import {
   getDevTicketDetails,
   getFeatureDevTickets,
   getFeatureTestTickets,
   getProjectFeatures,
+  getTestTicketDetails,
   updateDevTicketStatus,
   updateTestTicketStatus,
 } from "../services/projectService";
@@ -34,6 +35,7 @@ export default function ProjectFeaturesPage() {
   const [pendingTicketKeys, setPendingTicketKeys] = useState(() => new Set());
   const [dragOverStatus, setDragOverStatus] = useState("");
   const [selectedTicketKey, setSelectedTicketKey] = useState("");
+  const [selectedTicketType, setSelectedTicketType] = useState("development");
   const [ticketDetails, setTicketDetails] = useState(null);
   const [ticketDetailsLoading, setTicketDetailsLoading] = useState(false);
   const [ticketDetailsError, setTicketDetailsError] = useState("");
@@ -55,6 +57,7 @@ export default function ProjectFeaturesPage() {
       setPendingTicketKeys(new Set());
       setDragOverStatus("");
       setSelectedTicketKey("");
+      setSelectedTicketType("development");
       setTicketDetails(null);
       setTicketDetailsLoading(false);
       setTicketDetailsError("");
@@ -97,14 +100,17 @@ export default function ProjectFeaturesPage() {
       setTicketDetails(null);
 
       try {
-        const details = await getDevTicketDetails(selectedTicketKey);
+        const details =
+          selectedTicketType === "test"
+            ? await getTestTicketDetails(selectedTicketKey)
+            : await getDevTicketDetails(selectedTicketKey);
         if (active) setTicketDetails(details);
       } catch (error) {
         if (active) {
           setTicketDetailsError(
             error.response?.data?.message ||
               error.message ||
-              "Unable to load development ticket details."
+              `Unable to load ${selectedTicketType === "test" ? "test" : "development"} ticket details.`
           );
         }
       } finally {
@@ -117,7 +123,7 @@ export default function ProjectFeaturesPage() {
     return () => {
       active = false;
     };
-  }, [selectedTicketKey]);
+  }, [selectedTicketKey, selectedTicketType]);
 
   useEffect(() => {
     if (!selectedFeatureId) return undefined;
@@ -172,6 +178,11 @@ export default function ProjectFeaturesPage() {
     setTicketDetails(null);
     setTicketDetailsError("");
   }, []);
+
+  const handleTicketClick = (ticketKey, ticketType) => {
+    setSelectedTicketKey(ticketKey);
+    setSelectedTicketType(ticketType);
+  };
 
   const handleTicketDrop = async (event, status) => {
     event.preventDefault();
@@ -325,7 +336,7 @@ export default function ProjectFeaturesPage() {
               Test tickets
             </button>
           </div>
-          <DevTicketBoard
+          <TicketBoard
             ticketType={ticketView === "test" ? "test" : "development"}
             featureName={selectedFeature?.name}
             statuses={ticketStatuses}
@@ -336,17 +347,16 @@ export default function ProjectFeaturesPage() {
             pendingTicketKeys={pendingTicketKeys}
             dragOverStatus={dragOverStatus}
             onTicketDrop={handleTicketDrop}
-            onTicketClick={
-              ticketView === "development" ? setSelectedTicketKey : undefined
-            }
+            onTicketClick={handleTicketClick}
             onDragOverStatus={handleStatusDragOver}
             onDragLeaveStatus={handleStatusDragLeave}
           />
         </div>
       )}
 
-      {selectedTicketKey && ticketView === "development" && (
-        <DevTicketDetailsDialog
+      {selectedTicketKey && (
+        <TicketDetailsDialog
+          ticketType={selectedTicketType}
           ticketKey={selectedTicketKey}
           loading={ticketDetailsLoading}
           error={ticketDetailsError}

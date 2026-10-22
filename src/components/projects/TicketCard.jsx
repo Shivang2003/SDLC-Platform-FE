@@ -1,6 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 
-export default function DevTicketCard({
+export default function TicketCard({
   ticket,
   isUpdating,
   onClick,
