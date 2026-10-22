@@ -42,6 +42,25 @@ export const getFeatureDevTickets = async (projectId, featureId) => {
   throw new Error("Unexpected response while loading feature tickets.");
 };
 
+export const getProjectMembers = async (projectId) => {
+  const response = await api.get(`/project/${projectId}/project-members`);
+
+  if (Array.isArray(response.data)) {
+    return response.data;
+  }
+
+  throw new Error("Unexpected response while loading project members.");
+};
+
+export const createDevTicket = async (featureId, ticket) => {
+  const response = await api.post(
+    `/feature/${featureId}/create-dev-ticket`,
+    ticket
+  );
+
+  return response.data;
+};
+
 export const getFeatureTestTickets = async (projectId, featureId) => {
   const response = await api.get(
     `/project/${projectId}/features/${featureId}/test-tickets`

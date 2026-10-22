@@ -13,6 +13,8 @@ export default function TicketBoard({
   dragOverStatus,
   onTicketDrop,
   onTicketClick,
+  onCreateTicket,
+  creatingTicket,
   onDragOverStatus,
   onDragLeaveStatus,
 }) {
@@ -36,6 +38,21 @@ export default function TicketBoard({
           </span>
         )}
       </div>
+      {ticketType !== "test" && (
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onCreateTicket}
+            disabled={creatingTicket}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+          >
+            {creatingTicket && (
+              <LoaderCircle size={16} className="animate-spin" />
+            )}
+            Create dev ticket
+          </button>
+        </div>
+      )}
 
       {loading && (
         <div className="flex min-h-48 items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-500">

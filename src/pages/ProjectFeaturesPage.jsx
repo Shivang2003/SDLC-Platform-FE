@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Layers3, LoaderCircle } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import CreateDevTicketDialog from "../components/projects/CreateDevTicketDialog";
 import TicketDetailsDialog from "../components/projects/TicketDetailsDialog";
 import TicketBoard from "../components/projects/TicketBoard";
 import ProjectFeaturePanel from "../components/projects/ProjectFeaturePanel";
 import {
+  createDevTicket,
   getDevTicketDetails,
   getFeatureDevTickets,
   getFeatureTestTickets,
   getProjectFeatures,
+  getProjectMembers,
   getTestTicketDetails,
   updateDevTicketStatus,
   updateTestTicketStatus,
@@ -39,6 +42,13 @@ export default function ProjectFeaturesPage() {
   const [ticketDetails, setTicketDetails] = useState(null);
   const [ticketDetailsLoading, setTicketDetailsLoading] = useState(false);
   const [ticketDetailsError, setTicketDetailsError] = useState("");
+  const [ticketRefresh, setTicketRefresh] = useState(0);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [membersError, setMembersError] = useState("");
+  const [creatingTicket, setCreatingTicket] = useState(false);
+  const [createTicketError, setCreateTicketError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -61,6 +71,11 @@ export default function ProjectFeaturesPage() {
       setTicketDetails(null);
       setTicketDetailsLoading(false);
       setTicketDetailsError("");
+      setCreateDialogOpen(false);
+      setProjectMembers([]);
+      setMembersError("");
+      setCreatingTicket(false);
+      setCreateTicketError("");
 
       try {
         const featureList = await getProjectFeatures(projectId);
@@ -167,7 +182,7 @@ export default function ProjectFeaturesPage() {
     return () => {
       active = false;
     };
-  }, [projectId, selectedFeatureId, ticketView]);
+  }, [projectId, selectedFeatureId, ticketView, ticketRefresh]);
 
   const selectedFeature = features.find(
     (feature) => feature.featureId === selectedFeatureId
@@ -234,6 +249,45 @@ export default function ProjectFeaturesPage() {
     setTicketDetails(null);
     setTicketDetailsError("");
     setTicketView(view);
+  };
+
+  const handleOpenCreateTicket = async () => {
+    setLoadingMembers(true);
+    setMembersError("");
+    setCreateTicketError("");
+
+    try {
+      const members = await getProjectMembers(projectId);
+      setProjectMembers(members);
+      setCreateDialogOpen(true);
+    } catch (error) {
+      setMembersError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to load project members."
+      );
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const handleCreateTicket = async (ticket) => {
+    setCreatingTicket(true);
+    setCreateTicketError("");
+
+    try {
+      await createDevTicket(selectedFeatureId, ticket);
+      setCreateDialogOpen(false);
+      setTicketRefresh((current) => current + 1);
+    } catch (error) {
+      setCreateTicketError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to create the development ticket."
+      );
+    } finally {
+      setCreatingTicket(false);
+    }
   };
 
   const handleStatusDragOver = (event, status) => {
@@ -348,10 +402,30 @@ export default function ProjectFeaturesPage() {
             dragOverStatus={dragOverStatus}
             onTicketDrop={handleTicketDrop}
             onTicketClick={handleTicketClick}
+            onCreateTicket={handleOpenCreateTicket}
+            creatingTicket={loadingMembers}
             onDragOverStatus={handleStatusDragOver}
             onDragLeaveStatus={handleStatusDragLeave}
           />
+          {membersError && ticketView === "development" && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            >
+              {membersError}
+            </div>
+          )}
         </div>
+      )}
+
+      {createDialogOpen && (
+        <CreateDevTicketDialog
+          assignees={projectMembers}
+          submitting={creatingTicket}
+          error={createTicketError}
+          onClose={() => setCreateDialogOpen(false)}
+          onSubmit={handleCreateTicket}
+        />
       )}
 
       {selectedTicketKey && (
