@@ -2,13 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Layers3, LoaderCircle } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CreateDevTicketDialog from "../components/projects/CreateDevTicketDialog";
+import CreateTestTicketDialog from "../components/projects/CreateTestTicketDialog";
 import TicketDetailsDialog from "../components/projects/TicketDetailsDialog";
 import TicketBoard from "../components/projects/TicketBoard";
 import ProjectFeaturePanel from "../components/projects/ProjectFeaturePanel";
 import {
   createDevTicket,
+  createTestTicket,
   getDevTicketDetails,
   getFeatureDevTickets,
+  getFeatureDevTicketOptions,
   getFeatureTestTickets,
   getProjectFeatures,
   getProjectMembers,
@@ -49,6 +52,12 @@ export default function ProjectFeaturesPage() {
   const [membersError, setMembersError] = useState("");
   const [creatingTicket, setCreatingTicket] = useState(false);
   const [createTicketError, setCreateTicketError] = useState("");
+  const [createTestDialogOpen, setCreateTestDialogOpen] = useState(false);
+  const [devTicketOptions, setDevTicketOptions] = useState([]);
+  const [loadingDevTicketOptions, setLoadingDevTicketOptions] = useState(false);
+  const [devTicketOptionsError, setDevTicketOptionsError] = useState("");
+  const [creatingTestTicket, setCreatingTestTicket] = useState(false);
+  const [createTestTicketError, setCreateTestTicketError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -76,6 +85,11 @@ export default function ProjectFeaturesPage() {
       setMembersError("");
       setCreatingTicket(false);
       setCreateTicketError("");
+      setCreateTestDialogOpen(false);
+      setDevTicketOptions([]);
+      setDevTicketOptionsError("");
+      setCreatingTestTicket(false);
+      setCreateTestTicketError("");
 
       try {
         const featureList = await getProjectFeatures(projectId);
@@ -290,6 +304,51 @@ export default function ProjectFeaturesPage() {
     }
   };
 
+  const handleOpenCreateTestTicket = async () => {
+    setLoadingDevTicketOptions(true);
+    setDevTicketOptionsError("");
+    setCreateTestTicketError("");
+
+    try {
+      const ticketMap = await getFeatureDevTicketOptions(
+        projectId,
+        selectedFeatureId
+      );
+      setDevTicketOptions(
+        Object.entries(ticketMap).map(([key, title]) => ({ key, title }))
+      );
+      setCreateTestDialogOpen(true);
+    } catch (error) {
+      setDevTicketOptionsError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to load development tickets."
+      );
+    } finally {
+      setLoadingDevTicketOptions(false);
+    }
+  };
+
+  const handleCreateTestTicket = async (devTicketId, ticket) => {
+    setCreatingTestTicket(true);
+    setCreateTestTicketError("");
+
+    try {
+      await createTestTicket(selectedFeatureId, devTicketId, ticket);
+      setCreateTestDialogOpen(false);
+      setTicketView("test");
+      setTicketRefresh((current) => current + 1);
+    } catch (error) {
+      setCreateTestTicketError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to create the test ticket."
+      );
+    } finally {
+      setCreatingTestTicket(false);
+    }
+  };
+
   const handleStatusDragOver = (event, status) => {
     event.preventDefault();
     setDragOverStatus(status);
@@ -403,7 +462,12 @@ export default function ProjectFeaturesPage() {
             onTicketDrop={handleTicketDrop}
             onTicketClick={handleTicketClick}
             onCreateTicket={handleOpenCreateTicket}
-            creatingTicket={loadingMembers}
+            onCreateTestTicket={handleOpenCreateTestTicket}
+            creatingTicket={
+              ticketView === "test"
+                ? loadingDevTicketOptions
+                : loadingMembers
+            }
             onDragOverStatus={handleStatusDragOver}
             onDragLeaveStatus={handleStatusDragLeave}
           />
@@ -425,6 +489,25 @@ export default function ProjectFeaturesPage() {
           error={createTicketError}
           onClose={() => setCreateDialogOpen(false)}
           onSubmit={handleCreateTicket}
+        />
+      )}
+
+      {devTicketOptionsError && ticketView === "test" && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+        >
+          {devTicketOptionsError}
+        </div>
+      )}
+
+      {createTestDialogOpen && (
+        <CreateTestTicketDialog
+          devTickets={devTicketOptions}
+          submitting={creatingTestTicket}
+          error={createTestTicketError}
+          onClose={() => setCreateTestDialogOpen(false)}
+          onSubmit={handleCreateTestTicket}
         />
       )}
 

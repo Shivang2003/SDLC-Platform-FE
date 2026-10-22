@@ -1,26 +1,48 @@
 
 import { useEffect, useState } from "react";
-import { LoaderCircle, FolderKanban } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { getOrganizations } from "../services/organizationService";
-import { getOrganizationProjects } from "../services/projectService";
+import {
+  getOrganizationDashboardSummary,
+  getOrganizationBugStats,
+  getOrganizationDevTicketStats,
+  getOrganizationProjects,
+} from "../services/projectService";
 import ProjectGrid from "../components/projects/ProjectGrid";
 import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
+import OrganizationSummaryCards from "../components/projects/OrganizationSummaryCards";
+import DevTicketStatusChart from "../components/projects/DevTicketStatusChart";
+import BugPriorityChart from "../components/projects/BugPriorityChart";
 
 export default function ProjectsPage() {
   const { organizationId } = useParams();
 
   const [organization, setOrganization] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState("");
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState("");
+  const [devTicketStats, setDevTicketStats] = useState(null);
+  const [devTicketStatsLoading, setDevTicketStatsLoading] = useState(true);
+  const [devTicketStatsError, setDevTicketStatsError] = useState("");
+  const [bugStats, setBugStats] = useState(null);
+  const [bugStatsLoading, setBugStatsLoading] = useState(true);
+  const [bugStatsError, setBugStatsError] = useState("");
+  const [tabSelection, setTabSelection] = useState(null);
+  const activeTab =
+    tabSelection?.organizationId === organizationId
+      ? tabSelection.tab
+      : "summary";
 
   useEffect(() => {
     let active = true;
 
     async function loadProjects() {
-      setLoading(true);
-      setError("");
+      setProjectsLoading(true);
+      setProjectsError("");
       setProjects([]);
       setOrganization(null);
 
@@ -40,20 +62,116 @@ export default function ProjectsPage() {
         setProjects(projectList);
       } catch (error) {
         if (active) {
-          setError(
+          setProjectsError(
             error.response?.data?.message ||
               "Unable to load this organization's projects."
           );
         }
       } finally {
-        if (active) setLoading(false);
+        if (active) setProjectsLoading(false);
       }
     }
 
     if (organizationId) {
       loadProjects();
-    } else {
-      setLoading(false);
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [organizationId]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBugStats() {
+      setBugStatsLoading(true);
+      setBugStatsError("");
+      setBugStats(null);
+
+      try {
+        const stats = await getOrganizationBugStats(organizationId);
+        if (active) setBugStats(stats);
+      } catch (error) {
+        if (active) {
+          setBugStatsError(
+            error.response?.data?.message ||
+              "Unable to load bug statistics."
+          );
+        }
+      } finally {
+        if (active) setBugStatsLoading(false);
+      }
+    }
+
+    if (organizationId) {
+      loadBugStats();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [organizationId]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadDevTicketStats() {
+      setDevTicketStatsLoading(true);
+      setDevTicketStatsError("");
+      setDevTicketStats(null);
+
+      try {
+        const stats = await getOrganizationDevTicketStats(organizationId);
+        if (active) setDevTicketStats(stats);
+      } catch (error) {
+        if (active) {
+          setDevTicketStatsError(
+            error.response?.data?.message ||
+              "Unable to load development ticket statistics."
+          );
+        }
+      } finally {
+        if (active) setDevTicketStatsLoading(false);
+      }
+    }
+
+    if (organizationId) {
+      loadDevTicketStats();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [organizationId]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSummary() {
+      setSummaryLoading(true);
+      setSummaryError("");
+      setSummary(null);
+
+      try {
+        const dashboardSummary =
+          await getOrganizationDashboardSummary(organizationId);
+
+        if (active) setSummary(dashboardSummary);
+      } catch (error) {
+        if (active) {
+          setSummaryError(
+            error.response?.data?.message ||
+              "Unable to load this organization's dashboard summary."
+          );
+        }
+      } finally {
+        if (active) setSummaryLoading(false);
+      }
+    }
+
+    if (organizationId) {
+      loadSummary();
     }
 
     return () => {
@@ -81,43 +199,135 @@ export default function ProjectsPage() {
       </h1>
 
       <p className="mt-2 text-sm text-slate-500">
-        View and manage projects belonging to this organization.
+        View organization metrics and manage its projects.
       </p>
 
-      <div className="mb-5 mt-10 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">
-          Projects
-        </h2>
-
-        {!loading && !error && (
-          <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-            {projects.length} {projects.length === 1 ? "project" : "projects"}
-          </span>
-        )}
+      <div
+        className="mt-8 flex gap-6 border-b border-slate-200"
+        role="tablist"
+        aria-label="Organization views"
+      >
+        {[
+          { id: "summary", label: "Summary" },
+          { id: "projects", label: "Projects" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            id={`organization-tab-${tab.id}`}
+            aria-selected={activeTab === tab.id}
+            aria-controls={`organization-panel-${tab.id}`}
+            onClick={() => setTabSelection({ organizationId, tab: tab.id })}
+            className={`-mb-px border-b-2 px-1 py-3 text-sm font-semibold transition ${
+              activeTab === tab.id
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {loading && (
-        <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-slate-500">
-          <LoaderCircle size={22} className="animate-spin text-blue-600" />
-          Loading projects...
-        </div>
+      {activeTab === "summary" && (
+        <section
+          id="organization-panel-summary"
+          role="tabpanel"
+          aria-labelledby="organization-tab-summary"
+          className="pt-6"
+        >
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">
+              Organization summary
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              A snapshot of projects, tickets, tests, and bugs.
+            </p>
+          </div>
+
+          {summaryLoading && (
+            <OrganizationSummaryCards loading />
+          )}
+
+          {summaryError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {summaryError}
+            </div>
+          )}
+
+          {!summaryLoading && !summaryError && summary && (
+            <OrganizationSummaryCards summary={summary} />
+          )}
+          <div className="mt-6 grid gap-5 lg:grid-cols-2">
+            {devTicketStatsError ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+              >
+                {devTicketStatsError}
+              </div>
+            ) : (
+              <DevTicketStatusChart
+                stats={devTicketStats}
+                loading={devTicketStatsLoading}
+              />
+            )}
+            {bugStatsError ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+              >
+                {bugStatsError}
+              </div>
+            ) : (
+              <BugPriorityChart stats={bugStats} loading={bugStatsLoading} />
+            )}
+          </div>
+        </section>
       )}
 
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {activeTab === "projects" && (
+        <section
+          id="organization-panel-projects"
+          role="tabpanel"
+          aria-labelledby="organization-tab-projects"
+          className="pt-6"
+        >
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-900">Projects</h2>
+            {!projectsLoading && !projectsError && (
+              <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                {projects.length}{" "}
+                {projects.length === 1 ? "project" : "projects"}
+              </span>
+            )}
+          </div>
 
-      {!loading && !error && projects.length === 0 && (
-        <ProjectsEmptyState
-          title="No projects yet"
-          description="This organization doesn't have any projects. Projects will appear here when they are created."
-        />
-      )}
+          {projectsLoading && (
+            <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-slate-500">
+              <LoaderCircle size={22} className="animate-spin text-blue-600" />
+              Loading projects...
+            </div>
+          )}
 
-      {!loading && !error && projects.length > 0 && (
-        <ProjectGrid projects={projects} />
+          {projectsError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {projectsError}
+            </div>
+          )}
+
+          {!projectsLoading && !projectsError && projects.length === 0 && (
+            <ProjectsEmptyState
+              title="No projects yet"
+              description="This organization doesn't have any projects. Projects will appear here when they are created."
+            />
+          )}
+
+          {!projectsLoading && !projectsError && projects.length > 0 && (
+            <ProjectGrid projects={projects} />
+          )}
+        </section>
       )}
     </section>
   );
