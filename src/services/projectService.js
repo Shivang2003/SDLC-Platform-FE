@@ -42,10 +42,38 @@ export const getFeatureDevTickets = async (projectId, featureId) => {
   throw new Error("Unexpected response while loading feature tickets.");
 };
 
+export const getFeatureTestTickets = async (projectId, featureId) => {
+  const response = await api.get(
+    `/project/${projectId}/features/${featureId}/test-tickets`
+  );
+  const data = response.data;
+
+  if (
+    Array.isArray(data?.status) &&
+    Array.isArray(data?.devTickets)
+  ) {
+    return {
+      statuses: data.status,
+      tickets: data.devTickets,
+    };
+  }
+
+  throw new Error("Unexpected response while loading feature test tickets.");
+};
+
 export const updateDevTicketStatus = async (ticketKey, status) => {
   const response = await api.patch(
     `/dev-ticket/${encodeURIComponent(ticketKey)}/status`,
     { status }
+  );
+
+  return response.data;
+};
+
+export const updateTestTicketStatus = async (ticketKey, status) => {
+  const response = await api.patch(
+    `/test-ticket/${encodeURIComponent(ticketKey)}/status`,
+    { executionStatus: status }
   );
 
   return response.data;

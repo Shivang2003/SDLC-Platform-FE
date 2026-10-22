@@ -9,6 +9,7 @@ export default function DevTicketStatusColumn({
   onDragLeave,
   onDrop,
   onTicketClick,
+  ticketType,
 }) {
   const displayStatus = status.replaceAll("_", " ");
 
@@ -36,7 +37,8 @@ export default function DevTicketStatusColumn({
             key={ticket.key}
             ticket={ticket}
             isUpdating={pendingTicketKeys.has(ticket.key)}
-            onClick={() => onTicketClick(ticket.key)}
+            onClick={onTicketClick ? () => onTicketClick(ticket.key) : undefined}
+            ticketType={ticketType}
           />
         ))}
         {tickets.length === 0 && (

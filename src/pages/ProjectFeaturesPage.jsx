@@ -7,8 +7,10 @@ import ProjectFeaturePanel from "../components/projects/ProjectFeaturePanel";
 import {
   getDevTicketDetails,
   getFeatureDevTickets,
+  getFeatureTestTickets,
   getProjectFeatures,
   updateDevTicketStatus,
+  updateTestTicketStatus,
 } from "../services/projectService";
 
 export default function ProjectFeaturesPage() {
@@ -25,6 +27,7 @@ export default function ProjectFeaturesPage() {
   const [featuresError, setFeaturesError] = useState("");
   const [ticketStatuses, setTicketStatuses] = useState([]);
   const [devTickets, setDevTickets] = useState([]);
+  const [ticketView, setTicketView] = useState("development");
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [ticketsError, setTicketsError] = useState("");
   const [ticketActionError, setTicketActionError] = useState("");
@@ -45,6 +48,7 @@ export default function ProjectFeaturesPage() {
       setSelectedFeatureId("");
       setTicketStatuses([]);
       setDevTickets([]);
+      setTicketView("development");
       setTicketsLoading(false);
       setTicketsError("");
       setTicketActionError("");
@@ -130,15 +134,15 @@ export default function ProjectFeaturesPage() {
       setDragOverStatus("");
 
       try {
-        const ticketBoard = await getFeatureDevTickets(
-          projectId,
-          selectedFeatureId
-        );
+        const ticketBoard =
+          ticketView === "test"
+            ? await getFeatureTestTickets(projectId, selectedFeatureId)
+            : await getFeatureDevTickets(projectId, selectedFeatureId);
 
         if (!active) return;
 
-        setTicketStatuses(ticketBoard.status);
-        setDevTickets(ticketBoard.devTickets);
+        setTicketStatuses(ticketBoard.statuses ?? ticketBoard.status);
+        setDevTickets(ticketBoard.tickets ?? ticketBoard.devTickets);
       } catch (error) {
         if (active) {
           setTicketsError(
@@ -157,7 +161,7 @@ export default function ProjectFeaturesPage() {
     return () => {
       active = false;
     };
-  }, [projectId, selectedFeatureId]);
+  }, [projectId, selectedFeatureId, ticketView]);
 
   const selectedFeature = features.find(
     (feature) => feature.featureId === selectedFeatureId
@@ -188,7 +192,11 @@ export default function ProjectFeaturesPage() {
     setTicketActionError("");
 
     try {
-      await updateDevTicketStatus(ticketKey, status);
+      if (ticketView === "test") {
+        await updateTestTicketStatus(ticketKey, status);
+      } else {
+        await updateDevTicketStatus(ticketKey, status);
+      }
       setDevTickets((current) =>
         current.map((item) =>
           item.key === ticketKey ? { ...item, status } : item
@@ -207,6 +215,14 @@ export default function ProjectFeaturesPage() {
         return next;
       });
     }
+  };
+
+  const handleTicketViewChange = (view) => {
+    if (view === ticketView) return;
+    setSelectedTicketKey("");
+    setTicketDetails(null);
+    setTicketDetailsError("");
+    setTicketView(view);
   };
 
   const handleStatusDragOver = (event, status) => {
@@ -279,7 +295,38 @@ export default function ProjectFeaturesPage() {
             selectedFeature={selectedFeature}
             onSelectFeature={setSelectedFeatureId}
           />
+          <div
+            className="inline-flex rounded-lg border border-slate-200 bg-white p-1"
+            role="group"
+            aria-label="Ticket type"
+          >
+            <button
+              type="button"
+              aria-pressed={ticketView === "development"}
+              onClick={() => handleTicketViewChange("development")}
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                ticketView === "development"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              Dev tickets
+            </button>
+            <button
+              type="button"
+              aria-pressed={ticketView === "test"}
+              onClick={() => handleTicketViewChange("test")}
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                ticketView === "test"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              Test tickets
+            </button>
+          </div>
           <DevTicketBoard
+            ticketType={ticketView === "test" ? "test" : "development"}
             featureName={selectedFeature?.name}
             statuses={ticketStatuses}
             tickets={devTickets}
@@ -289,14 +336,16 @@ export default function ProjectFeaturesPage() {
             pendingTicketKeys={pendingTicketKeys}
             dragOverStatus={dragOverStatus}
             onTicketDrop={handleTicketDrop}
-            onTicketClick={setSelectedTicketKey}
+            onTicketClick={
+              ticketView === "development" ? setSelectedTicketKey : undefined
+            }
             onDragOverStatus={handleStatusDragOver}
             onDragLeaveStatus={handleStatusDragLeave}
           />
         </div>
       )}
 
-      {selectedTicketKey && (
+      {selectedTicketKey && ticketView === "development" && (
         <DevTicketDetailsDialog
           ticketKey={selectedTicketKey}
           loading={ticketDetailsLoading}

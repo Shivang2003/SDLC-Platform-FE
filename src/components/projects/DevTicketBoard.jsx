@@ -2,6 +2,7 @@ import { LoaderCircle } from "lucide-react";
 import DevTicketStatusColumn from "./DevTicketStatusColumn";
 
 export default function DevTicketBoard({
+  ticketType,
   featureName,
   statuses,
   tickets,
@@ -23,7 +24,7 @@ export default function DevTicketBoard({
             id="ticket-board-heading"
             className="text-lg font-semibold text-slate-900"
           >
-            Development tickets
+            {ticketType === "test" ? "Test tickets" : "Development tickets"}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             Tickets for {featureName}
@@ -77,6 +78,7 @@ export default function DevTicketBoard({
               onDragLeave={() => onDragLeaveStatus(status)}
               onDrop={(event) => onTicketDrop(event, status)}
               onTicketClick={onTicketClick}
+              ticketType={ticketType}
             />
           ))}
         </div>
