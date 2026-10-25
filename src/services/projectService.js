@@ -201,6 +201,15 @@ export const getDevTicketDetails = async (ticketKey) => {
   throw new Error("Unexpected response while loading development ticket details.");
 };
 
+export const editDevTicket = async (ticketKey, ticket) => {
+  const response = await api.patch(
+    `/dev-ticket/${encodeURIComponent(ticketKey)}/edit`,
+    ticket
+  );
+
+  return response.data;
+};
+
 export const getTestTicketDetails = async (ticketKey) => {
   const response = await api.get(
     `/test-ticket/${encodeURIComponent(ticketKey)}/details`

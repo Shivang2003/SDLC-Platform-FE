@@ -1,4 +1,17 @@
-export default function TestTicketCard({ ticket }) {
+const executionStatuses = [
+  "PASS",
+  "FAIL",
+  "BLOCKED",
+  "SKIPPED",
+  "NOT_EXECUTED",
+];
+
+export default function TestTicketCard({
+  ticket,
+  editing = false,
+  executionStatus = ticket.executionStatus,
+  onExecutionStatusChange,
+}) {
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -19,9 +32,30 @@ export default function TestTicketCard({ ticket }) {
         <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">
           {ticket.testCaseStatus.replaceAll("_", " ")}
         </span>
-        <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">
-          {ticket.executionStatus.replaceAll("_", " ")}
-        </span>
+        {editing ? (
+          <label className="flex items-center gap-2 rounded bg-slate-100 px-2 py-1 text-slate-600">
+            <span className="sr-only">
+              Execution status for {ticket.key}
+            </span>
+            <select
+              value={executionStatus}
+              onChange={(event) =>
+                onExecutionStatusChange(ticket.key, event.target.value)
+              }
+              className="bg-transparent text-[11px] font-medium outline-none"
+            >
+              {executionStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">
+            {ticket.executionStatus.replaceAll("_", " ")}
+          </span>
+        )}
         <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">
           Revision {ticket.currentRevision}
         </span>

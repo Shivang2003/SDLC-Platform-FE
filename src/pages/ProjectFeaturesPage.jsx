@@ -9,6 +9,7 @@ import ProjectFeaturePanel from "../components/projects/ProjectFeaturePanel";
 import {
   createDevTicket,
   createTestTicket,
+  editDevTicket,
   getDevTicketDetails,
   getFeatureDevTickets,
   getFeatureDevTicketOptions,
@@ -45,6 +46,10 @@ export default function ProjectFeaturesPage() {
   const [ticketDetails, setTicketDetails] = useState(null);
   const [ticketDetailsLoading, setTicketDetailsLoading] = useState(false);
   const [ticketDetailsError, setTicketDetailsError] = useState("");
+  const [ticketDetailsRefresh, setTicketDetailsRefresh] = useState(0);
+  const [loadingEditAssignees, setLoadingEditAssignees] = useState(false);
+  const [savingTicketEdit, setSavingTicketEdit] = useState(false);
+  const [ticketEditError, setTicketEditError] = useState("");
   const [ticketRefresh, setTicketRefresh] = useState(0);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [projectMembers, setProjectMembers] = useState([]);
@@ -80,6 +85,10 @@ export default function ProjectFeaturesPage() {
       setTicketDetails(null);
       setTicketDetailsLoading(false);
       setTicketDetailsError("");
+      setTicketDetailsRefresh(0);
+      setLoadingEditAssignees(false);
+      setSavingTicketEdit(false);
+      setTicketEditError("");
       setCreateDialogOpen(false);
       setProjectMembers([]);
       setMembersError("");
@@ -152,7 +161,7 @@ export default function ProjectFeaturesPage() {
     return () => {
       active = false;
     };
-  }, [selectedTicketKey, selectedTicketType]);
+  }, [selectedTicketKey, selectedTicketType, ticketDetailsRefresh]);
 
   useEffect(() => {
     if (!selectedFeatureId) return undefined;
@@ -211,6 +220,55 @@ export default function ProjectFeaturesPage() {
   const handleTicketClick = (ticketKey, ticketType) => {
     setSelectedTicketKey(ticketKey);
     setSelectedTicketType(ticketType);
+    setTicketEditError("");
+  };
+
+  const handleLoadEditAssignees = async () => {
+    setLoadingEditAssignees(true);
+    setTicketEditError("");
+
+    try {
+      const members = await getProjectMembers(projectId);
+      setProjectMembers(members);
+      return members;
+    } catch (error) {
+      setTicketEditError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to load project members."
+      );
+      return null;
+    } finally {
+      setLoadingEditAssignees(false);
+    }
+  };
+
+  const handleSaveDevTicketEdit = async (ticket) => {
+    setSavingTicketEdit(true);
+    setTicketEditError("");
+
+    try {
+      await editDevTicket(selectedTicketKey, {
+        title: ticket.title,
+        description: ticket.description,
+        priority: ticket.priority,
+        targetVersionId: ticket.targetVersionId,
+        assigneeId: ticket.assigneeId,
+        testTicketStatuses: ticket.testTicketStatuses,
+      });
+      setTicketRefresh((current) => current + 1);
+      setTicketDetailsRefresh((current) => current + 1);
+      return true;
+    } catch (error) {
+      setTicketEditError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to update this development ticket."
+      );
+      return false;
+    } finally {
+      setSavingTicketEdit(false);
+    }
   };
 
   const handleTicketDrop = async (event, status) => {
@@ -519,6 +577,12 @@ export default function ProjectFeaturesPage() {
           error={ticketDetailsError}
           details={ticketDetails}
           onClose={handleCloseTicketDetails}
+          assignees={projectMembers}
+          loadingAssignees={loadingEditAssignees}
+          editError={ticketEditError}
+          savingEdit={savingTicketEdit}
+          onEdit={handleLoadEditAssignees}
+          onSaveEdit={handleSaveDevTicketEdit}
         />
       )}
     </section>
