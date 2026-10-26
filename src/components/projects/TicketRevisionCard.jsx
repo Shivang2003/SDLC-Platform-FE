@@ -20,12 +20,26 @@ export default function TicketRevisionCard({ revision }) {
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-medium">
-        <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">
-          {revision.status.replaceAll("_", " ")}
-        </span>
-        <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">
-          Assignee: {revision.assigneeUserName || "Unassigned"}
-        </span>
+        {revision.status && (
+          <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">
+            {revision.status.replaceAll("_", " ")}
+          </span>
+        )}
+        {revision.testCaseStatus && (
+          <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">
+            Test case: {revision.testCaseStatus.replaceAll("_", " ")}
+          </span>
+        )}
+        {revision.executionStatus && (
+          <span className="rounded bg-blue-50 px-2 py-1 text-blue-700">
+            Execution: {revision.executionStatus.replaceAll("_", " ")}
+          </span>
+        )}
+        {revision.assigneeUserName && (
+          <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">
+            Assignee: {revision.assigneeUserName}
+          </span>
+        )}
       </div>
 
       <div className="mt-4 border-t border-slate-100 pt-3 text-[11px] text-slate-500">

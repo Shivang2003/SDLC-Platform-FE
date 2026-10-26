@@ -220,6 +220,26 @@ export const getDevTicketRevisions = async (ticketKey) => {
   throw new Error("Unexpected response while loading ticket revisions.");
 };
 
+export const getTestTicketRevisions = async (ticketKey) => {
+  const response = await api.get(
+    `/test-ticket/${encodeURIComponent(ticketKey)}/revisions`
+  );
+
+  if (
+    Array.isArray(response.data) &&
+    response.data.every(
+      (revision) =>
+        typeof revision.revisionNumber === "number" &&
+        typeof revision.ticketKey === "string" &&
+        typeof revision.executionStatus === "string"
+    )
+  ) {
+    return response.data;
+  }
+
+  throw new Error("Unexpected response while loading test ticket revisions.");
+};
+
 export const editDevTicket = async (ticketKey, ticket) => {
   const response = await api.patch(
     `/dev-ticket/${encodeURIComponent(ticketKey)}/edit`,

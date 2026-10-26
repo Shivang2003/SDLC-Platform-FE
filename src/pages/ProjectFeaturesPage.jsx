@@ -18,6 +18,7 @@ import {
   getProjectFeatures,
   getProjectMembers,
   getDevTicketRevisions,
+  getTestTicketRevisions,
   getTestTicketDetails,
   updateDevTicketStatus,
   updateTestTicketStatus,
@@ -240,10 +241,8 @@ export default function ProjectFeaturesPage() {
   };
 
   const handleLoadTicketRevisions = async () => {
-    if (
-      selectedTicketType !== "development" ||
-      revisionsLoadedForKey === selectedTicketKey
-    ) {
+    const revisionCacheKey = `${selectedTicketType}:${selectedTicketKey}`;
+    if (revisionsLoadedForKey === revisionCacheKey) {
       return;
     }
 
@@ -251,9 +250,12 @@ export default function ProjectFeaturesPage() {
     setTicketRevisionsError("");
 
     try {
-      const revisions = await getDevTicketRevisions(selectedTicketKey);
+      const revisions =
+        selectedTicketType === "test"
+          ? await getTestTicketRevisions(selectedTicketKey)
+          : await getDevTicketRevisions(selectedTicketKey);
       setTicketRevisions(revisions);
-      setRevisionsLoadedForKey(selectedTicketKey);
+      setRevisionsLoadedForKey(revisionCacheKey);
     } catch (error) {
       setTicketRevisionsError(
         error.response?.data?.message ||

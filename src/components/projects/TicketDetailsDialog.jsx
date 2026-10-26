@@ -146,7 +146,7 @@ export default function TicketDetailsDialog({
         {!loading && !error && ticket && (
           <>
             <div className="flex justify-end border-b border-slate-100 px-5 py-3 sm:px-7">
-                {!isTestTicket && !isEditing && (
+                {!isEditing && (
                   <button
                     type="button"
                     onClick={() => {
@@ -531,7 +531,7 @@ export default function TicketDetailsDialog({
               </dl>}
             </article>
 
-            {showPreviousRevisions && !isTestTicket ? (
+            {showPreviousRevisions ? (
               <section
                 aria-labelledby="previous-revisions-heading"
                 className="flex min-h-0 flex-col p-5 sm:p-7"
@@ -554,7 +554,7 @@ export default function TicketDetailsDialog({
                     onClick={() => setShowPreviousRevisions(false)}
                     className="text-sm font-semibold text-blue-700 hover:text-blue-800"
                   >
-                    Back to test tickets
+                    Back to ticket details
                   </button>
                 </div>
                 {revisionsLoading && (
