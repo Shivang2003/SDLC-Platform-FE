@@ -49,7 +49,7 @@ export default function TicketDetailsDialog({
 
   const handleSave = async (event) => {
     event.preventDefault();
-    const saved = await onSaveEdit(editValues);
+    const saved = await onSaveEdit(editValues, ticketType);
     if (saved) setIsEditing(false);
   };
 
@@ -57,21 +57,35 @@ export default function TicketDetailsDialog({
     const availableAssignees = await onEdit();
     if (!availableAssignees) return;
 
-    setEditValues({
-      title: ticket.title ?? "",
-      description: ticket.description ?? "",
-      priority: ticket.priority ?? "MEDIUM",
-      assigneeId:
-        ticket.assigneeId ??
-        ticket.assignee ??
-        availableAssignees[0] ??
-        "",
-      targetVersionId: ticket.targetVersionId ?? null,
-      testTicketStatuses: (details?.testTickets ?? []).map((testTicket) => ({
-        testTicketKey: testTicket.key,
-        executionStatus: testTicket.executionStatus ?? "NOT_EXECUTED",
-      })),
-    });
+    setEditValues(
+      isTestTicket
+        ? {
+            title: ticket.title ?? "",
+            description: ticket.description ?? "",
+            priority: ticket.priority ?? "MEDIUM",
+            testCaseStatus: ticket.testCaseStatus ?? "DRAFT",
+            executionStatus: ticket.executionStatus ?? "NOT_EXECUTED",
+            assigneeUserName:
+              ticket.assigneeUserName ?? availableAssignees[0] ?? "",
+          }
+        : {
+            title: ticket.title ?? "",
+            description: ticket.description ?? "",
+            priority: ticket.priority ?? "MEDIUM",
+            assigneeId:
+              ticket.assigneeId ??
+              ticket.assignee ??
+              availableAssignees[0] ??
+              "",
+            targetVersionId: ticket.targetVersionId ?? null,
+            testTicketStatuses: (details?.testTickets ?? []).map(
+              (testTicket) => ({
+                testTicketKey: testTicket.key,
+                executionStatus: testTicket.executionStatus ?? "NOT_EXECUTED",
+              })
+            ),
+          }
+    );
     setIsEditing(true);
   };
 
@@ -125,8 +139,7 @@ export default function TicketDetailsDialog({
 
         {!loading && !error && ticket && (
           <>
-            {!isTestTicket && (
-              <div className="flex justify-end border-b border-slate-100 px-5 py-3 sm:px-7">
+            <div className="flex justify-end border-b border-slate-100 px-5 py-3 sm:px-7">
                 {isEditing ? (
                   <div className="flex gap-2">
                     <button
@@ -139,7 +152,7 @@ export default function TicketDetailsDialog({
                     </button>
                     <button
                       type="submit"
-                      form="edit-dev-ticket-form"
+                      form="edit-ticket-form"
                       disabled={savingEdit || loadingAssignees}
                       className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                     >
@@ -166,8 +179,7 @@ export default function TicketDetailsDialog({
                     Edit
                   </button>
                 )}
-              </div>
-            )}
+            </div>
             {editError && !isEditing && (
               <p
                 role="alert"
@@ -178,9 +190,152 @@ export default function TicketDetailsDialog({
             )}
             <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <article className="overflow-y-auto border-b border-slate-200 p-5 md:border-b-0 md:border-r sm:p-7">
-              {isEditing && !isTestTicket ? (
+              {isEditing && isTestTicket ? (
                 <form
-                  id="edit-dev-ticket-form"
+                  id="edit-ticket-form"
+                  onSubmit={handleSave}
+                  className="space-y-5"
+                >
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Title
+                    </span>
+                    <input
+                      required
+                      value={editValues?.title ?? ""}
+                      onChange={(event) =>
+                        setEditValues((current) => ({
+                          ...current,
+                          title: event.target.value,
+                        }))
+                      }
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Description
+                    </span>
+                    <textarea
+                      rows={5}
+                      value={editValues?.description ?? ""}
+                      onChange={(event) =>
+                        setEditValues((current) => ({
+                          ...current,
+                          description: event.target.value,
+                        }))
+                      }
+                      className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Assignee
+                    </span>
+                    <select
+                      required
+                      value={editValues?.assigneeUserName ?? ""}
+                      onChange={(event) =>
+                        setEditValues((current) => ({
+                          ...current,
+                          assigneeUserName: event.target.value,
+                        }))
+                      }
+                      disabled={assignees.length === 0}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    >
+                      {assignees.map((assignee) => (
+                        <option key={assignee} value={assignee}>
+                          {assignee}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Priority
+                      </span>
+                      <select
+                        value={editValues?.priority ?? "MEDIUM"}
+                        onChange={(event) =>
+                          setEditValues((current) => ({
+                            ...current,
+                            priority: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      >
+                        {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map(
+                          (priority) => (
+                            <option key={priority} value={priority}>
+                              {priority}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Test case status
+                      </span>
+                      <select
+                        value={editValues?.testCaseStatus ?? "DRAFT"}
+                        onChange={(event) =>
+                          setEditValues((current) => ({
+                            ...current,
+                            testCaseStatus: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      >
+                        {["DRAFT", "ACTIVE", "DEPRECATED"].map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Execution status
+                      </span>
+                      <select
+                        value={editValues?.executionStatus ?? "NOT_EXECUTED"}
+                        onChange={(event) =>
+                          setEditValues((current) => ({
+                            ...current,
+                            executionStatus: event.target.value,
+                          }))
+                        }
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      >
+                        {[
+                          "PASS",
+                          "FAIL",
+                          "BLOCKED",
+                          "SKIPPED",
+                          "NOT_EXECUTED",
+                        ].map((status) => (
+                          <option key={status} value={status}>
+                            {status.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {editError && (
+                    <p
+                      role="alert"
+                      className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                    >
+                      {editError}
+                    </p>
+                  )}
+                </form>
+              ) : isEditing ? (
+                <form
+                  id="edit-ticket-form"
                   onSubmit={handleSave}
                   className="space-y-5"
                 >
@@ -357,7 +512,7 @@ export default function TicketDetailsDialog({
               </dl>}
             </article>
 
-            <section
+            {!isTestTicket && <section
               aria-labelledby="test-tickets-heading"
               className="flex min-h-0 flex-col p-5 sm:p-7"
             >
@@ -404,7 +559,7 @@ export default function TicketDetailsDialog({
                   </p>
                 )}
               </div>
-            </section>
+            </section>}
           </div>
           </>
         )}

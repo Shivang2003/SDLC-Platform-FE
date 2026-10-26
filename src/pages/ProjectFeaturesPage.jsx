@@ -10,6 +10,7 @@ import {
   createDevTicket,
   createTestTicket,
   editDevTicket,
+  editTestTicket,
   getDevTicketDetails,
   getFeatureDevTickets,
   getFeatureDevTicketOptions,
@@ -243,19 +244,30 @@ export default function ProjectFeaturesPage() {
     }
   };
 
-  const handleSaveDevTicketEdit = async (ticket) => {
+  const handleSaveTicketEdit = async (ticket, ticketType) => {
     setSavingTicketEdit(true);
     setTicketEditError("");
 
     try {
-      await editDevTicket(selectedTicketKey, {
-        title: ticket.title,
-        description: ticket.description,
-        priority: ticket.priority,
-        targetVersionId: ticket.targetVersionId,
-        assigneeId: ticket.assigneeId,
-        testTicketStatuses: ticket.testTicketStatuses,
-      });
+      if (ticketType === "test") {
+        await editTestTicket(selectedTicketKey, {
+          title: ticket.title,
+          description: ticket.description,
+          priority: ticket.priority,
+          testCaseStatus: ticket.testCaseStatus,
+          executionStatus: ticket.executionStatus,
+          assigneeUserName: ticket.assigneeUserName,
+        });
+      } else {
+        await editDevTicket(selectedTicketKey, {
+          title: ticket.title,
+          description: ticket.description,
+          priority: ticket.priority,
+          targetVersionId: ticket.targetVersionId,
+          assigneeId: ticket.assigneeId,
+          testTicketStatuses: ticket.testTicketStatuses,
+        });
+      }
       setTicketRefresh((current) => current + 1);
       setTicketDetailsRefresh((current) => current + 1);
       return true;
@@ -263,7 +275,7 @@ export default function ProjectFeaturesPage() {
       setTicketEditError(
         error.response?.data?.message ||
           error.message ||
-          "Unable to update this development ticket."
+          `Unable to update this ${ticketType === "test" ? "test" : "development"} ticket.`
       );
       return false;
     } finally {
@@ -582,7 +594,7 @@ export default function ProjectFeaturesPage() {
           editError={ticketEditError}
           savingEdit={savingTicketEdit}
           onEdit={handleLoadEditAssignees}
-          onSaveEdit={handleSaveDevTicketEdit}
+          onSaveEdit={handleSaveTicketEdit}
         />
       )}
     </section>
