@@ -17,6 +17,7 @@ import {
   getFeatureTestTickets,
   getProjectFeatures,
   getProjectMembers,
+  getDevTicketRevisions,
   getTestTicketDetails,
   updateDevTicketStatus,
   updateTestTicketStatus,
@@ -48,6 +49,10 @@ export default function ProjectFeaturesPage() {
   const [ticketDetailsLoading, setTicketDetailsLoading] = useState(false);
   const [ticketDetailsError, setTicketDetailsError] = useState("");
   const [ticketDetailsRefresh, setTicketDetailsRefresh] = useState(0);
+  const [ticketRevisions, setTicketRevisions] = useState([]);
+  const [ticketRevisionsLoading, setTicketRevisionsLoading] = useState(false);
+  const [ticketRevisionsError, setTicketRevisionsError] = useState("");
+  const [revisionsLoadedForKey, setRevisionsLoadedForKey] = useState("");
   const [loadingEditAssignees, setLoadingEditAssignees] = useState(false);
   const [savingTicketEdit, setSavingTicketEdit] = useState(false);
   const [ticketEditError, setTicketEditError] = useState("");
@@ -87,6 +92,10 @@ export default function ProjectFeaturesPage() {
       setTicketDetailsLoading(false);
       setTicketDetailsError("");
       setTicketDetailsRefresh(0);
+      setTicketRevisions([]);
+      setTicketRevisionsLoading(false);
+      setTicketRevisionsError("");
+      setRevisionsLoadedForKey("");
       setLoadingEditAssignees(false);
       setSavingTicketEdit(false);
       setTicketEditError("");
@@ -216,12 +225,44 @@ export default function ProjectFeaturesPage() {
     setSelectedTicketKey("");
     setTicketDetails(null);
     setTicketDetailsError("");
+    setTicketRevisions([]);
+    setTicketRevisionsError("");
+    setRevisionsLoadedForKey("");
   }, []);
 
   const handleTicketClick = (ticketKey, ticketType) => {
     setSelectedTicketKey(ticketKey);
     setSelectedTicketType(ticketType);
     setTicketEditError("");
+    setTicketRevisions([]);
+    setTicketRevisionsError("");
+    setRevisionsLoadedForKey("");
+  };
+
+  const handleLoadTicketRevisions = async () => {
+    if (
+      selectedTicketType !== "development" ||
+      revisionsLoadedForKey === selectedTicketKey
+    ) {
+      return;
+    }
+
+    setTicketRevisionsLoading(true);
+    setTicketRevisionsError("");
+
+    try {
+      const revisions = await getDevTicketRevisions(selectedTicketKey);
+      setTicketRevisions(revisions);
+      setRevisionsLoadedForKey(selectedTicketKey);
+    } catch (error) {
+      setTicketRevisionsError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to load previous revisions."
+      );
+    } finally {
+      setTicketRevisionsLoading(false);
+    }
   };
 
   const handleLoadEditAssignees = async () => {
@@ -593,8 +634,12 @@ export default function ProjectFeaturesPage() {
           loadingAssignees={loadingEditAssignees}
           editError={ticketEditError}
           savingEdit={savingTicketEdit}
+          revisions={ticketRevisions}
+          revisionsLoading={ticketRevisionsLoading}
+          revisionsError={ticketRevisionsError}
           onEdit={handleLoadEditAssignees}
           onSaveEdit={handleSaveTicketEdit}
+          onShowRevisions={handleLoadTicketRevisions}
         />
       )}
     </section>
