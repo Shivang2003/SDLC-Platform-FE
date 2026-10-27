@@ -1,6 +1,14 @@
 
 import api from "../lib/axios";
 
+export const createOrganizationProject = async (organizationId, project) => {
+  const response = await api.post(
+    `/organization/${organizationId}/create-project`,
+    project
+  );
+  return response.data;
+};
+
 export const getOrganizationProjects = async (organizationId) => {
   const response = await api.get(
     `/organization/${organizationId}/projects`
