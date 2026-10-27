@@ -799,7 +799,7 @@ export default function Editor({
       
        if (selection.rangeCount > 0){
          const rect = selection.getRangeAt(0).getBoundingClientRect();
-          const editorRect = el.getBoundingClientRect();
+          const editorRect = el.parentElement.getBoundingClientRect();
           console.log(rect, editorRect);
           setMentionState({
             isActive: true,
@@ -807,8 +807,8 @@ export default function Editor({
             query,
             startIndex,
             position: {
-              top: rect.bottom - editorRect.top + 75,
-              left: rect.left - editorRect.left + 15
+              top: rect.top - editorRect.top - 4,
+              left: rect.left - editorRect.left
             }
           });
           return true;
@@ -837,6 +837,11 @@ export default function Editor({
         const searchText = searchParameter;//for search
         return searchText.toLowerCase().includes(query.toLowerCase());
       })
+
+      useEffect(() => {
+        const selectedOption = dropdownRef.current?.children[selectedIndex];
+        selectedOption?.scrollIntoView({ block: "nearest" });
+      }, [selectedIndex]);
 
       useEffect(() => {
           const handleKeyDown = (e) => {
@@ -879,6 +884,7 @@ export default function Editor({
         style={{
           top: position.top,
           left: position.left,
+          transform: "translateY(-100%)",
         }}
       >
         {filteredMentions.map((mention, index) => (
@@ -1212,7 +1218,7 @@ export default function Editor({
           : "max-w-4xl mx-auto p-4"
       }
     >
-      <div className="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
+      <div className="relative border border-gray-300 rounded-lg bg-white shadow-sm">
         <Toolbar onCommand={handleCommand} formatState={formatState} />
 
         <div

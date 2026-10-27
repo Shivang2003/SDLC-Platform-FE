@@ -708,7 +708,7 @@ export default function TicketDetailsDialog({
                   )}
                   {!mentionsLoading && !mentionsError && requiredMentions && (
                     <div>
-                      <div className="overflow-hidden rounded-lg border border-slate-200">
+                      <div className="rounded-lg border border-slate-200">
                         <Editor
                           key={editorInstance}
                           requiredMentions={requiredMentions}
