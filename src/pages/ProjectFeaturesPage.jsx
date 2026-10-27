@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Layers3, LoaderCircle } from "lucide-react";
+import { ArrowLeft, Layers3, LoaderCircle, Plus } from "lucide-react";
+import { toast } from "sonner";
 import {
   useLocation,
   useNavigate,
@@ -11,7 +12,9 @@ import CreateTestTicketDialog from "../components/projects/CreateTestTicketDialo
 import TicketDetailsDialog from "../components/projects/TicketDetailsDialog";
 import TicketBoard from "../components/projects/TicketBoard";
 import ProjectFeaturePanel from "../components/projects/ProjectFeaturePanel";
+import CreateFeatureDialog from "../components/projects/CreateFeatureDialog";
 import {
+  createProjectFeature,
   createDevTicket,
   createTestTicket,
   editDevTicket,
@@ -49,6 +52,10 @@ export default function ProjectFeaturesPage() {
     : (features[0]?.featureId ?? "");
   const [featuresLoading, setFeaturesLoading] = useState(true);
   const [featuresError, setFeaturesError] = useState("");
+  const [featureRefresh, setFeatureRefresh] = useState(0);
+  const [createFeatureDialogOpen, setCreateFeatureDialogOpen] = useState(false);
+  const [creatingFeature, setCreatingFeature] = useState(false);
+  const [createFeatureError, setCreateFeatureError] = useState("");
   const [ticketStatuses, setTicketStatuses] = useState([]);
   const [devTickets, setDevTickets] = useState([]);
   const [ticketView, setTicketView] = useState("development");
@@ -124,7 +131,6 @@ export default function ProjectFeaturesPage() {
 
         if (!active) return;
         setFeatures(featureList);
-        setFeatures(featureList);
       } catch (error) {
         if (active) {
           setFeaturesError(
@@ -143,7 +149,27 @@ export default function ProjectFeaturesPage() {
     return () => {
       active = false;
     };
-  }, [projectId]);
+  }, [projectId, featureRefresh]);
+
+  const handleCreateFeature = async (feature) => {
+    setCreatingFeature(true);
+    setCreateFeatureError("");
+
+    try {
+      await createProjectFeature(projectId, feature);
+      setCreateFeatureDialogOpen(false);
+      toast.success("Feature created successfully.");
+      setFeatureRefresh((current) => current + 1);
+    } catch (error) {
+      setCreateFeatureError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to create the feature."
+      );
+    } finally {
+      setCreatingFeature(false);
+    }
+  };
 
   useEffect(() => {
     if (featuresLoading || features.length === 0) return;
@@ -545,13 +571,26 @@ export default function ProjectFeaturesPage() {
         {projectName}
       </h1>
 
-      <div className="mb-5 mt-10 flex items-center justify-between">
+      <div className="mb-5 mt-10 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-900">Features</h2>
-        {!featuresLoading && !featuresError && (
-          <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-            {features.length} {features.length === 1 ? "feature" : "features"}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {!featuresLoading && !featuresError && (
+            <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+              {features.length} {features.length === 1 ? "feature" : "features"}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setCreateFeatureError("");
+              setCreateFeatureDialogOpen(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            <Plus size={17} />
+            Create feature
+          </button>
+        </div>
       </div>
 
       {featuresLoading && (
@@ -658,6 +697,15 @@ export default function ProjectFeaturesPage() {
           error={createTicketError}
           onClose={() => setCreateDialogOpen(false)}
           onSubmit={handleCreateTicket}
+        />
+      )}
+
+      {createFeatureDialogOpen && (
+        <CreateFeatureDialog
+          onClose={() => setCreateFeatureDialogOpen(false)}
+          onSubmit={handleCreateFeature}
+          submitting={creatingFeature}
+          error={createFeatureError}
         />
       )}
 

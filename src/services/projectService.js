@@ -96,6 +96,14 @@ export const getProjectFeatures = async (projectId) => {
   throw new Error("Unexpected response while loading project features.");
 };
 
+export const createProjectFeature = async (projectId, feature) => {
+  const response = await api.post(
+    `/project/${projectId}/create-feature`,
+    feature
+  );
+  return response.data;
+};
+
 export const getFeatureDevTickets = async (projectId, featureId) => {
   const response = await api.get(
     `/project/${projectId}/features/${featureId}/dev-tickets`
