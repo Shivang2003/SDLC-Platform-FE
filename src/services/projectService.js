@@ -104,6 +104,33 @@ export const createProjectFeature = async (projectId, feature) => {
   return response.data;
 };
 
+export const getProjectMentions = async (projectId) => {
+  const response = await api.get(`/mention/${projectId}`);
+  const requiredMentions = response.data?.requiredMentions;
+
+  if (
+    !requiredMentions ||
+    typeof requiredMentions !== "object" ||
+    Array.isArray(requiredMentions)
+  ) {
+    throw new Error("Unexpected response while loading comment mentions.");
+  }
+
+  return requiredMentions;
+};
+
+export const addTicketComment = async (ticketId, ticketType, delta) => {
+  if (!["DEV", "TEST", "BUG"].includes(ticketType)) {
+    throw new Error("Unsupported ticket type for comments.");
+  }
+
+  const response = await api.post(`/comment/${encodeURIComponent(ticketId)}`, {
+    ticketType,
+    comment: { delta },
+  });
+  return response.data;
+};
+
 export const getFeatureDevTickets = async (projectId, featureId) => {
   const response = await api.get(
     `/project/${projectId}/features/${featureId}/dev-tickets`

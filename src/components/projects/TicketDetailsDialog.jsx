@@ -1,5 +1,17 @@
 import { useEffect, useState } from "react";
-import { History, LoaderCircle, Pencil, Save, X } from "lucide-react";
+import {
+  History,
+  LoaderCircle,
+  MessageSquareText,
+  Pencil,
+  Save,
+  X,
+} from "lucide-react";
+import Editor from "../editor/MentionEditor";
+import {
+  addTicketComment,
+  getProjectMentions,
+} from "../../services/projectService";
 import BugTicketCard from "./BugTicketCard";
 import TestTicketCard from "./TestTicketCard";
 import TicketRevisionCard from "./TicketRevisionCard";
@@ -7,6 +19,7 @@ import TicketRevisionCard from "./TicketRevisionCard";
 export default function TicketDetailsDialog({
   ticketType,
   ticketKey,
+  projectId,
   loading,
   error,
   details,
@@ -25,6 +38,13 @@ export default function TicketDetailsDialog({
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState(null);
   const [showPreviousRevisions, setShowPreviousRevisions] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [requiredMentions, setRequiredMentions] = useState(null);
+  const [mentionsLoading, setMentionsLoading] = useState(false);
+  const [mentionsError, setMentionsError] = useState("");
+  const [sendingComment, setSendingComment] = useState(false);
+  const [commentError, setCommentError] = useState("");
+  const [editorInstance, setEditorInstance] = useState(0);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -41,6 +61,49 @@ export default function TicketDetailsDialog({
     ? details?.bugTickets
     : details?.testTickets;
   const relatedTicketType = isTestTicket ? "Bug tickets" : "Test tickets";
+  const commentTicketId =
+    ticket?.ticketId ?? ticket?._id ?? ticket?.key ?? ticketKey;
+  const commentTicketType =
+    ticketType === "test" ? "TEST" : ticketType === "bug" ? "BUG" : "DEV";
+
+  const handleOpenComments = async () => {
+    setShowPreviousRevisions(false);
+    setShowComments(true);
+    setMentionsLoading(true);
+    setMentionsError("");
+    setCommentError("");
+
+    try {
+      setRequiredMentions(await getProjectMentions(projectId));
+    } catch (error) {
+      setRequiredMentions(null);
+      setMentionsError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to load comment mentions."
+      );
+    } finally {
+      setMentionsLoading(false);
+    }
+  };
+
+  const handleSubmitComment = async (delta) => {
+    setSendingComment(true);
+    setCommentError("");
+
+    try {
+      await addTicketComment(commentTicketId, commentTicketType, delta);
+      setEditorInstance((current) => current + 1);
+    } catch (error) {
+      setCommentError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to add this comment."
+      );
+    } finally {
+      setSendingComment(false);
+    }
+  };
 
   const updateTestTicketStatus = (testTicketKey, executionStatus) => {
     setEditValues((current) => ({
@@ -63,6 +126,7 @@ export default function TicketDetailsDialog({
     const availableAssignees = await onEdit();
     if (!availableAssignees) return;
 
+    setShowComments(false);
     setEditValues(
       isTestTicket
         ? {
@@ -151,12 +215,23 @@ export default function TicketDetailsDialog({
                     type="button"
                     onClick={() => {
                       setShowPreviousRevisions(true);
+                      setShowComments(false);
                       onShowRevisions();
                     }}
                     className="mr-auto inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                   >
                     <History size={15} />
                     Previous revisions
+                  </button>
+                )}
+                {!isEditing && (
+                  <button
+                    type="button"
+                    onClick={handleOpenComments}
+                    className="mr-auto inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <MessageSquareText size={15} />
+                    Comments
                   </button>
                 )}
                 {isEditing ? (
@@ -531,7 +606,75 @@ export default function TicketDetailsDialog({
               </dl>}
             </article>
 
-            {showPreviousRevisions ? (
+            {showComments && !isTestTicket ? (
+              <section
+                aria-labelledby="ticket-comments-heading"
+                className="flex min-h-0 flex-col overflow-y-auto p-5 sm:p-7"
+              >
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h3
+                    id="ticket-comments-heading"
+                    className="text-base font-bold text-slate-900"
+                  >
+                    Comments
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowComments(false)}
+                    className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                  >
+                    Back to related tickets
+                  </button>
+                </div>
+
+                {mentionsLoading && (
+                  <div className="flex min-h-24 items-center justify-center gap-2 text-sm text-slate-500">
+                    <LoaderCircle
+                      size={18}
+                      className="animate-spin text-blue-600"
+                    />
+                    Loading mention options...
+                  </div>
+                )}
+                {mentionsError && (
+                  <div className="space-y-3">
+                    <p
+                      role="alert"
+                      className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                    >
+                      {mentionsError}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleOpenComments}
+                      className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+                {!mentionsLoading && !mentionsError && requiredMentions && (
+                  <>
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <Editor
+                        key={editorInstance}
+                        requiredMentions={requiredMentions}
+                        onSubmitDelta={handleSubmitComment}
+                        submitting={sendingComment}
+                      />
+                    </div>
+                    {commentError && (
+                      <p
+                        role="alert"
+                        className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                      >
+                        {commentError}
+                      </p>
+                    )}
+                  </>
+                )}
+              </section>
+            ) : showPreviousRevisions ? (
               <section
                 aria-labelledby="previous-revisions-heading"
                 className="flex min-h-0 flex-col p-5 sm:p-7"

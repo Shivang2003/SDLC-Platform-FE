@@ -730,8 +730,10 @@ export default function ProjectFeaturesPage() {
 
       {selectedTicketKey && (
         <TicketDetailsDialog
+          key={`${selectedTicketType}:${selectedTicketKey}`}
           ticketType={selectedTicketType}
           ticketKey={selectedTicketKey}
+          projectId={projectId}
           loading={ticketDetailsLoading}
           error={ticketDetailsError}
           details={ticketDetails}
