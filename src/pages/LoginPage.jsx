@@ -30,9 +30,9 @@ export default function LoginPage() {
 
 const onSubmit = async (values) => {
   try {
-    await loginUser(values);
+    const user = await loginUser(values);
 
-    login();
+    login(user);
 
     toast.success("Welcome back!");
     navigate("/organizations", { replace: true });

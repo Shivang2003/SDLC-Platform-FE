@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { LoaderCircle } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { getOrganizations } from "../services/organizationService";
 import {
   getOrganizationDashboardSummary,
@@ -17,6 +17,7 @@ import BugPriorityChart from "../components/projects/BugPriorityChart";
 
 export default function ProjectsPage() {
   const { organizationId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [organization, setOrganization] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -31,11 +32,8 @@ export default function ProjectsPage() {
   const [bugStats, setBugStats] = useState(null);
   const [bugStatsLoading, setBugStatsLoading] = useState(true);
   const [bugStatsError, setBugStatsError] = useState("");
-  const [tabSelection, setTabSelection] = useState(null);
   const activeTab =
-    tabSelection?.organizationId === organizationId
-      ? tabSelection.tab
-      : "summary";
+    searchParams.get("view") === "projects" ? "projects" : "summary";
 
   useEffect(() => {
     let active = true;
@@ -55,7 +53,9 @@ export default function ProjectsPage() {
         if (!active) return;
 
         const selectedOrganization = organizations.find(
-          (item) => String(item.id ?? item._id) === organizationId
+          (item) =>
+            String(item.organizationId ?? item.id ?? item._id) ===
+            organizationId
         );
 
         setOrganization(selectedOrganization ?? null);
@@ -218,7 +218,13 @@ export default function ProjectsPage() {
             id={`organization-tab-${tab.id}`}
             aria-selected={activeTab === tab.id}
             aria-controls={`organization-panel-${tab.id}`}
-            onClick={() => setTabSelection({ organizationId, tab: tab.id })}
+            onClick={() => {
+              setSearchParams((current) => {
+                const next = new URLSearchParams(current);
+                next.set("view", tab.id);
+                return next;
+              });
+            }}
             className={`-mb-px border-b-2 px-1 py-3 text-sm font-semibold transition ${
               activeTab === tab.id
                 ? "border-blue-600 text-blue-700"

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Layers3, LoaderCircle } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import CreateDevTicketDialog from "../components/projects/CreateDevTicketDialog";
 import CreateTestTicketDialog from "../components/projects/CreateTestTicketDialog";
 import TicketDetailsDialog from "../components/projects/TicketDetailsDialog";
@@ -25,15 +30,23 @@ import {
 } from "../services/projectService";
 
 export default function ProjectFeaturesPage() {
-  const { projectId } = useParams();
+  const { organizationId, projectId, featureId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const project = location.state?.project;
   const projectName =
     project?.name ?? project?.projectName ?? "Project features";
+  const selectedTicketKey = searchParams.get("ticket") ?? "";
+  const selectedTicketType =
+    searchParams.get("ticketType") === "test" ? "test" : "development";
 
   const [features, setFeatures] = useState([]);
-  const [selectedFeatureId, setSelectedFeatureId] = useState("");
+  const selectedFeatureId = features.some(
+    (feature) => feature.featureId === featureId
+  )
+    ? featureId
+    : (features[0]?.featureId ?? "");
   const [featuresLoading, setFeaturesLoading] = useState(true);
   const [featuresError, setFeaturesError] = useState("");
   const [ticketStatuses, setTicketStatuses] = useState([]);
@@ -44,8 +57,6 @@ export default function ProjectFeaturesPage() {
   const [ticketActionError, setTicketActionError] = useState("");
   const [pendingTicketKeys, setPendingTicketKeys] = useState(() => new Set());
   const [dragOverStatus, setDragOverStatus] = useState("");
-  const [selectedTicketKey, setSelectedTicketKey] = useState("");
-  const [selectedTicketType, setSelectedTicketType] = useState("development");
   const [ticketDetails, setTicketDetails] = useState(null);
   const [ticketDetailsLoading, setTicketDetailsLoading] = useState(false);
   const [ticketDetailsError, setTicketDetailsError] = useState("");
@@ -78,7 +89,6 @@ export default function ProjectFeaturesPage() {
       setFeaturesLoading(true);
       setFeaturesError("");
       setFeatures([]);
-      setSelectedFeatureId("");
       setTicketStatuses([]);
       setDevTickets([]);
       setTicketView("development");
@@ -87,8 +97,6 @@ export default function ProjectFeaturesPage() {
       setTicketActionError("");
       setPendingTicketKeys(new Set());
       setDragOverStatus("");
-      setSelectedTicketKey("");
-      setSelectedTicketType("development");
       setTicketDetails(null);
       setTicketDetailsLoading(false);
       setTicketDetailsError("");
@@ -115,9 +123,8 @@ export default function ProjectFeaturesPage() {
         const featureList = await getProjectFeatures(projectId);
 
         if (!active) return;
-
         setFeatures(featureList);
-        setSelectedFeatureId(featureList[0]?.featureId ?? "");
+        setFeatures(featureList);
       } catch (error) {
         if (active) {
           setFeaturesError(
@@ -137,6 +144,33 @@ export default function ProjectFeaturesPage() {
       active = false;
     };
   }, [projectId]);
+
+  useEffect(() => {
+    if (featuresLoading || features.length === 0) return;
+
+    const resolvedFeatureId = features.some(
+      (feature) => feature.featureId === featureId
+    )
+      ? featureId
+      : features[0].featureId;
+
+    if (resolvedFeatureId !== featureId) {
+      const projectPath = organizationId
+        ? `/organizations/${organizationId}/projects/${projectId}`
+        : `/projects/${projectId}`;
+      navigate(`${projectPath}/features/${resolvedFeatureId}${location.search}`, {
+        replace: true,
+      });
+    }
+  }, [
+    featureId,
+    features,
+    featuresLoading,
+    location.search,
+    navigate,
+    organizationId,
+    projectId,
+  ]);
 
   useEffect(() => {
     if (!selectedTicketKey) return undefined;
@@ -222,18 +256,34 @@ export default function ProjectFeaturesPage() {
     (feature) => feature.featureId === selectedFeatureId
   );
 
+  const handleSelectFeature = (nextFeatureId) => {
+    const projectPath = organizationId
+      ? `/organizations/${organizationId}/projects/${projectId}`
+      : `/projects/${projectId}`;
+    navigate(`${projectPath}/features/${nextFeatureId}${location.search}`);
+  };
+
   const handleCloseTicketDetails = useCallback(() => {
-    setSelectedTicketKey("");
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("ticket");
+      next.delete("ticketType");
+      return next;
+    });
     setTicketDetails(null);
     setTicketDetailsError("");
     setTicketRevisions([]);
     setTicketRevisionsError("");
     setRevisionsLoadedForKey("");
-  }, []);
+  }, [setSearchParams]);
 
   const handleTicketClick = (ticketKey, ticketType) => {
-    setSelectedTicketKey(ticketKey);
-    setSelectedTicketType(ticketType);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("ticket", ticketKey);
+      next.set("ticketType", ticketType);
+      return next;
+    });
     setTicketEditError("");
     setTicketRevisions([]);
     setTicketRevisionsError("");
@@ -372,7 +422,7 @@ export default function ProjectFeaturesPage() {
 
   const handleTicketViewChange = (view) => {
     if (view === ticketView) return;
-    setSelectedTicketKey("");
+    handleCloseTicketDetails();
     setTicketDetails(null);
     setTicketDetailsError("");
     setTicketView(view);
@@ -475,7 +525,13 @@ export default function ProjectFeaturesPage() {
     <section>
       <button
         type="button"
-        onClick={() => navigate(-1)}
+        onClick={() =>
+          navigate(
+            organizationId
+              ? `/organizations/${organizationId}/projects?view=projects`
+              : "/projects"
+          )
+        }
         className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-blue-600"
       >
         <ArrowLeft size={17} />
@@ -530,7 +586,7 @@ export default function ProjectFeaturesPage() {
           <ProjectFeaturePanel
             features={features}
             selectedFeature={selectedFeature}
-            onSelectFeature={setSelectedFeatureId}
+            onSelectFeature={handleSelectFeature}
           />
           <div
             className="inline-flex rounded-lg border border-slate-200 bg-white p-1"

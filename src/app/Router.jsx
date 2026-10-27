@@ -82,6 +82,18 @@ export default function AppRouter() {
             path="/organizations/:organizationId/projects"
             element={<ProjectsPage />}
           />
+          <Route
+            path="/organizations/:organizationId/projects/:projectId"
+            element={<ProjectFeaturesPage />}
+          />
+          <Route
+            path="/organizations/:organizationId/projects/:projectId/features/:featureId"
+            element={<ProjectFeaturesPage />}
+          />
+          <Route
+            path="/projects/:projectId/features/:featureId"
+            element={<ProjectFeaturesPage />}
+          />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

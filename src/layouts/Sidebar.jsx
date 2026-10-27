@@ -1,9 +1,20 @@
 
 import { useEffect, useState } from "react";
-import { Building2, Layers, LoaderCircle, LogOut } from "lucide-react";
+import {
+  Building2,
+  Layers,
+  LoaderCircle,
+  LogOut,
+  Plus,
+} from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import CreateOrganizationDialog from "../components/organizations/CreateOrganizationDialog";
 import { useAuthStore } from "../stores/authStore";
-import { getOrganizations } from "../services/organizationService";
+import {
+  createOrganization,
+  getOrganizations,
+} from "../services/organizationService";
 
 export default function Sidebar() {
   const [organizations, setOrganizations] = useState([]);
@@ -12,6 +23,11 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const { organizationId } = useParams();
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [creatingOrganization, setCreatingOrganization] = useState(false);
+  const [createOrganizationError, setCreateOrganizationError] = useState("");
+  const isAdmin = Array.isArray(user?.roles) && user.roles.includes("ADMIN");
 
   useEffect(() => {
     let active = true;
@@ -40,6 +56,37 @@ export default function Sidebar() {
     navigate("/login", { replace: true });
   };
 
+  const handleCreateOrganization = async (organization) => {
+    setCreatingOrganization(true);
+    setCreateOrganizationError("");
+
+    try {
+      await createOrganization(organization);
+    } catch (error) {
+      setCreateOrganizationError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to create the organization."
+      );
+      setCreatingOrganization(false);
+      return;
+    }
+
+    setCreatingOrganization(false);
+    setCreateDialogOpen(false);
+    toast.success("Organization created successfully.");
+
+    try {
+      const data = await getOrganizations();
+      setOrganizations(data);
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ||
+          "Organization created, but the organization list could not be refreshed."
+      );
+    }
+  };
+
   return (
     <aside className="flex min-h-screen w-64 shrink-0 flex-col bg-slate-900 px-4 py-6 text-slate-200">
       <button
@@ -55,6 +102,20 @@ export default function Sidebar() {
       <div className="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
         Your organizations
       </div>
+
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={() => {
+            setCreateOrganizationError("");
+            setCreateDialogOpen(true);
+          }}
+          className="mb-3 flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2.5 text-left text-sm font-semibold text-slate-200 transition hover:border-blue-400 hover:bg-slate-800 hover:text-white"
+        >
+          <Plus size={17} className="text-blue-400" />
+          Create organization
+        </button>
+      )}
 
       <nav className="flex flex-col gap-1">
         {loading && (
@@ -101,6 +162,15 @@ export default function Sidebar() {
         <LogOut size={18} />
         Logout
       </button>
+
+      {createDialogOpen && (
+        <CreateOrganizationDialog
+          onClose={() => setCreateDialogOpen(false)}
+          onSubmit={handleCreateOrganization}
+          submitting={creatingOrganization}
+          error={createOrganizationError}
+        />
+      )}
     </aside>
   );
 }

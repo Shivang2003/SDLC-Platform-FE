@@ -1,9 +1,10 @@
 
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ProjectCard from "./ProjectCard";
 
 export default function ProjectGrid({ projects }) {
   const navigate = useNavigate();
+  const { organizationId } = useParams();
 
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -16,7 +17,12 @@ export default function ProjectGrid({ projects }) {
             project={project}
             index={index}
             onClick={() =>
-              navigate(`/projects/${projectId}`, { state: { project } })
+              navigate(
+                organizationId
+                  ? `/organizations/${organizationId}/projects/${projectId}?view=projects`
+                  : `/projects/${projectId}`,
+                { state: { project } }
+              )
             }
           />
         );
