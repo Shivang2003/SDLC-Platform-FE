@@ -18,6 +18,25 @@ import BugTicketCard from "./BugTicketCard";
 import TestTicketCard from "./TestTicketCard";
 import TicketRevisionCard from "./TicketRevisionCard";
 
+const getAssignedToLabel = (assignedTo) => {
+  if (typeof assignedTo === "string") return assignedTo;
+  if (Array.isArray(assignedTo)) {
+    return assignedTo.map(getAssignedToLabel).filter(Boolean).join(", ");
+  }
+  if (!assignedTo || typeof assignedTo !== "object") return "";
+
+  const user = assignedTo.user ?? assignedTo;
+  return (
+    user.userName ??
+    user.username ??
+    user.name ??
+    user.email ??
+    user.userId ??
+    user.id ??
+    ""
+  );
+};
+
 export default function TicketDetailsDialog({
   ticketType,
   ticketKey,
@@ -41,9 +60,8 @@ export default function TicketDetailsDialog({
   const [editValues, setEditValues] = useState(null);
   const [showPreviousRevisions, setShowPreviousRevisions] = useState(false);
   const [showComments, setShowComments] = useState(false);
-  const [requiredMentions, setRequiredMentions] = useState(null);
-  const [mentionsLoading, setMentionsLoading] = useState(false);
-  const [mentionsError, setMentionsError] = useState("");
+  const [mentionsRefresh, setMentionsRefresh] = useState(0);
+  const [mentionsResult, setMentionsResult] = useState(null);
   const [sendingComment, setSendingComment] = useState(false);
   const [commentError, setCommentError] = useState("");
   const [editorInstance, setEditorInstance] = useState(0);
@@ -70,6 +88,19 @@ export default function TicketDetailsDialog({
     ticket?.ticketId ?? ticket?._id ?? ticket?.key ?? ticketKey;
   const commentTicketType =
     ticketType === "test" ? "TEST" : ticketType === "bug" ? "BUG" : "DEV";
+  const assignedToLabel =
+    getAssignedToLabel(ticket?.assignedTo) ||
+    ticket?.assigneeUserName ||
+    getAssignedToLabel(ticket?.assignee) ||
+    "Unassigned";
+  const mentionsRequestKey = `${projectId}:${commentTicketId}:${mentionsRefresh}`;
+  const currentMentionsResult =
+    mentionsResult?.requestKey === mentionsRequestKey ? mentionsResult : null;
+  const requiredMentions = currentMentionsResult?.data ?? null;
+  const mentionsError = currentMentionsResult?.error ?? "";
+  const mentionsLoading = Boolean(
+    ticket && commentTicketId && !currentMentionsResult
+  );
 
   useEffect(() => {
     if (!ticket || !commentTicketId) return undefined;
@@ -103,25 +134,40 @@ export default function TicketDetailsDialog({
     };
   }, [commentTicketId, ticket]);
 
-  const handleOpenComments = async () => {
+  useEffect(() => {
+    if (!ticket || !projectId) return undefined;
+
+    let active = true;
+    const requestKey = `${projectId}:${commentTicketId}:${mentionsRefresh}`;
+
+    async function loadMentions() {
+      try {
+        const mentions = await getProjectMentions(projectId);
+        if (active) setMentionsResult({ requestKey, data: mentions });
+      } catch (error) {
+        if (active) {
+          setMentionsResult({
+            requestKey,
+            error:
+              error.response?.data?.message ||
+              error.message ||
+              "Unable to load comment mentions.",
+          });
+        }
+      }
+    }
+
+    loadMentions();
+
+    return () => {
+      active = false;
+    };
+  }, [projectId, commentTicketId, ticket, mentionsRefresh]);
+
+  const handleOpenComments = () => {
     setShowPreviousRevisions(false);
     setShowComments(true);
-    setMentionsLoading(true);
-    setMentionsError("");
     setCommentError("");
-
-    try {
-      setRequiredMentions(await getProjectMentions(projectId));
-    } catch (error) {
-      setRequiredMentions(null);
-      setMentionsError(
-        error.response?.data?.message ||
-          error.message ||
-          "Unable to load comment mentions."
-      );
-    } finally {
-      setMentionsLoading(false);
-    }
   };
 
   const handleSubmitComment = async (delta) => {
@@ -217,7 +263,7 @@ export default function TicketDetailsDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="dev-ticket-dialog-title"
-        className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
       >
         <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-7">
           <div>
@@ -256,71 +302,6 @@ export default function TicketDetailsDialog({
 
         {!loading && !error && ticket && (
           <>
-            <div className="flex justify-end border-b border-slate-100 px-5 py-3 sm:px-7">
-                {!isEditing && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowPreviousRevisions(true);
-                      setShowComments(false);
-                      onShowRevisions();
-                    }}
-                    className="mr-auto inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <History size={15} />
-                    Previous revisions
-                  </button>
-                )}
-                {!isEditing && (
-                  <button
-                    type="button"
-                    onClick={handleOpenComments}
-                    className="mr-auto inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <MessageSquareText size={15} />
-                    Comments
-                  </button>
-                )}
-                {isEditing ? (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(false)}
-                      disabled={savingEdit}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      form="edit-ticket-form"
-                      disabled={savingEdit || loadingAssignees}
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {savingEdit ? (
-                        <LoaderCircle size={15} className="animate-spin" />
-                      ) : (
-                        <Save size={15} />
-                      )}
-                      Save
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleStartEdit}
-                    disabled={loadingAssignees}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    {loadingAssignees ? (
-                      <LoaderCircle size={15} className="animate-spin" />
-                    ) : (
-                      <Pencil size={15} />
-                    )}
-                    Edit
-                  </button>
-                )}
-            </div>
             {editError && !isEditing && (
               <p
                 role="alert"
@@ -331,14 +312,14 @@ export default function TicketDetailsDialog({
             )}
             <div
               className={`grid min-h-0 flex-1 ${
-                showComments && !isTestTicket
+                showComments
                   ? "grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
                   : "md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
               }`}
             >
             <article
-              className={`overflow-y-auto border-b border-slate-200 p-5 sm:p-7 md:border-b-0 md:border-r ${
-                showComments && !isTestTicket ? "min-h-0" : ""
+              className={`overflow-y-auto border-b border-slate-200 px-5 pb-5 pt-2 sm:px-7 sm:pb-7 sm:pt-3 md:border-b-0 md:border-r ${
+                showComments ? "min-h-0" : ""
               }`}
             >
               <div>
@@ -601,9 +582,29 @@ export default function TicketDetailsDialog({
                   <p className="text-xs font-semibold text-blue-700">
                     {ticket.key}
                   </p>
-                  <h3 className="mt-2 text-xl font-bold text-slate-900">
-                    {ticket.title}
-                  </h3>
+                  <div className="mt-2 flex items-center gap-2">
+                    <h3 className="text-xl font-bold text-slate-900">
+                      {ticket.title}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleStartEdit}
+                      disabled={loadingAssignees}
+                      aria-label={`Edit ${ticket.title}`}
+                      title="Edit ticket"
+                      className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-blue-700 disabled:opacity-50"
+                    >
+                      {loadingAssignees ? (
+                        <LoaderCircle
+                          size={16}
+                          className="animate-spin"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <Pencil size={16} aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <span className="rounded bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                   {ticket.priority}
@@ -639,6 +640,14 @@ export default function TicketDetailsDialog({
                 )}
                 <div>
                   <dt className="text-xs font-medium text-slate-500">
+                    Assigned to
+                  </dt>
+                  <dd className="mt-1 break-all font-semibold text-slate-800">
+                    {assignedToLabel}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-slate-500">
                     Revision
                   </dt>
                   <dd className="mt-1 font-semibold text-slate-800">
@@ -664,7 +673,7 @@ export default function TicketDetailsDialog({
               </dl>}
               </div>
 
-              {showComments && !isTestTicket && (
+              {showComments && (
                 <div className="mt-6 border-t border-slate-200 pt-4">
                   <h3 className="mb-2 text-sm font-bold text-slate-900">
                     Add a comment
@@ -688,7 +697,9 @@ export default function TicketDetailsDialog({
                       </p>
                       <button
                         type="button"
-                        onClick={handleOpenComments}
+                        onClick={() =>
+                          setMentionsRefresh((current) => current + 1)
+                        }
                         className="text-sm font-semibold text-blue-700 hover:text-blue-800"
                       >
                         Retry
@@ -720,10 +731,62 @@ export default function TicketDetailsDialog({
               )}
             </article>
 
-            {showComments && !isTestTicket ? (
+            <div className="flex min-h-0 flex-col">
+              <div className="flex justify-end gap-2 px-5 pt-5 sm:px-7">
+                {isEditing ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      disabled={savingEdit}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      form="edit-ticket-form"
+                      disabled={savingEdit || loadingAssignees}
+                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {savingEdit ? (
+                        <LoaderCircle size={15} className="animate-spin" />
+                      ) : (
+                        <Save size={15} />
+                      )}
+                      Save
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPreviousRevisions(true);
+                        setShowComments(false);
+                        onShowRevisions();
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <History size={15} />
+                      Previous revisions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenComments}
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <MessageSquareText size={15} />
+                      Comments
+                    </button>
+                  </>
+                )}
+              </div>
+
+            {showComments ? (
               <section
                 aria-labelledby="ticket-comments-heading"
-                className="flex min-h-0 flex-col overflow-y-auto p-5 sm:p-7"
+                className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 sm:p-7"
               >
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <h3
@@ -798,7 +861,7 @@ export default function TicketDetailsDialog({
             ) : showPreviousRevisions ? (
               <section
                 aria-labelledby="previous-revisions-heading"
-                className="flex min-h-0 flex-col p-5 sm:p-7"
+                className="flex min-h-0 flex-1 flex-col p-5 sm:p-7"
               >
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
@@ -856,7 +919,7 @@ export default function TicketDetailsDialog({
               </section>
             ) : <section
               aria-labelledby="test-tickets-heading"
-              className="flex min-h-0 flex-col p-5 sm:p-7"
+              className="flex min-h-0 flex-1 flex-col p-5 sm:p-7"
             >
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
@@ -902,6 +965,7 @@ export default function TicketDetailsDialog({
                 )}
               </div>
             </section>}
+            </div>
           </div>
           </>
         )}

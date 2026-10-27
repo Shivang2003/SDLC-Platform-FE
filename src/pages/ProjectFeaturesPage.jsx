@@ -369,9 +369,9 @@ export default function ProjectFeaturesPage() {
     setRevisionsLoadedForKey("");
   };
 
-  const handleLoadTicketRevisions = async () => {
+  const handleLoadTicketRevisions = async (forceRefresh = false) => {
     const revisionCacheKey = `${selectedTicketType}:${selectedTicketKey}`;
-    if (revisionsLoadedForKey === revisionCacheKey) {
+    if (!forceRefresh && revisionsLoadedForKey === revisionCacheKey) {
       return;
     }
 
@@ -442,6 +442,7 @@ export default function ProjectFeaturesPage() {
       }
       setTicketRefresh((current) => current + 1);
       setTicketDetailsRefresh((current) => current + 1);
+      await handleLoadTicketRevisions(true);
       return true;
     } catch (error) {
       setTicketEditError(
