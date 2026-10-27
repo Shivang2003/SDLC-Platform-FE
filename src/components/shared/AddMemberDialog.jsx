@@ -3,7 +3,7 @@ import { LoaderCircle, X } from "lucide-react";
 
 const organizationRoles = ["ADMIN", "OWNER", "VIEWER", "WORKER"];
 
-export default function AddOrganizationMemberDialog({
+export default function AddMemberDialog({
   users,
   usersLoading,
   usersError,

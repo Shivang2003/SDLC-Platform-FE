@@ -748,6 +748,7 @@ export default function Editor({
   requiredMentions,
   onSubmitDelta,
   submitting = false,
+  compact = false,
 }) {
   const hostRef = useRef(null);
   const [doc] = useState(() => new DeltaDocument("\n"));
@@ -755,6 +756,7 @@ export default function Editor({
   const formatRef = useRef({});
   const composingRef = useRef(false);
   const [formatState, setFormatState] = useState({});
+  const [hasCommentContent, setHasCommentContent] = useState(false);
   const [mentionState, setMentionState] = useState({
       isActive: false,
       trigger: null,
@@ -767,7 +769,13 @@ export default function Editor({
     const el = hostRef.current;
     if (!el) return;
 
-    renderDelta(el, doc.getDelta());
+    const delta = doc.getDelta();
+    renderDelta(el, delta);
+    setHasCommentContent(
+      delta.ops.some(
+        (op) => typeof op.insert === "string" && op.insert.trim().length > 0
+      )
+    );
     setSelectionFromModel(el, doc.selection);
 
   }, [doc]);
@@ -1197,7 +1205,13 @@ export default function Editor({
   );
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
+    <div
+      className={
+        compact
+          ? "w-full max-w-none p-0 [&>div:first-child>div:first-child]:flex [&>div:first-child>div:first-child]:flex-wrap [&>div:first-child>div:first-child]:gap-1 [&>div:first-child>div:first-child]:p-2"
+          : "max-w-4xl mx-auto p-4"
+      }
+    >
       <div className="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
         <Toolbar onCommand={handleCommand} formatState={formatState} />
 
@@ -1206,7 +1220,11 @@ export default function Editor({
           contentEditable
           role="textbox"
           spellCheck={false}
-          className="outline-none p-4 min-h-[300px] text-base leading-relaxed bg-white text-black"
+          className={`outline-none p-4 text-base leading-relaxed bg-white text-black ${
+            compact
+              ? "h-28 min-h-28 max-h-28 overflow-y-auto"
+              : "min-h-[300px]"
+          }`}
           style={{
             whiteSpace: "pre-wrap",
           }}
@@ -1224,13 +1242,13 @@ export default function Editor({
 
       </div>
 
-      <div className="mt-6">
+      <div className={compact ? "mt-2" : "mt-6"}>
         <button
           type="button"
-          disabled={submitting || !onSubmitDelta}
-          className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition-colors duration-200"
+          disabled={submitting || !onSubmitDelta || !hasCommentContent}
+          className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => {
-            onSubmitDelta?.(doc.getDelta());
+            if (hasCommentContent) onSubmitDelta?.(doc.getDelta());
           }}
         >
           {submitting ? "Sending..." : "Send"}

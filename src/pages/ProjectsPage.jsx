@@ -20,7 +20,7 @@ import ProjectsEmptyState from "../components/projects/ProjectsEmptyState";
 import OrganizationSummaryCards from "../components/projects/OrganizationSummaryCards";
 import DevTicketStatusChart from "../components/projects/DevTicketStatusChart";
 import BugPriorityChart from "../components/projects/BugPriorityChart";
-import AddOrganizationMemberDialog from "../components/organizations/AddOrganizationMemberDialog";
+import AddMemberDialog from "../components/shared/AddMemberDialog";
 import CreateProjectDialog from "../components/projects/CreateProjectDialog";
 
 export default function ProjectsPage() {
@@ -438,7 +438,7 @@ export default function ProjectsPage() {
       )}
 
       {addMemberDialogOpen && (
-        <AddOrganizationMemberDialog
+        <AddMemberDialog
           users={users}
           usersLoading={usersLoading}
           usersError={usersError}

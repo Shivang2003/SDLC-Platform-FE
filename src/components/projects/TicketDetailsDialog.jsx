@@ -11,7 +11,9 @@ import Editor from "../editor/MentionEditor";
 import {
   addTicketComment,
   getProjectMentions,
+  getTicketComments,
 } from "../../services/projectService";
+import Renderer from "../editor/MentionRenderer";
 import BugTicketCard from "./BugTicketCard";
 import TestTicketCard from "./TestTicketCard";
 import TicketRevisionCard from "./TicketRevisionCard";
@@ -45,6 +47,9 @@ export default function TicketDetailsDialog({
   const [sendingComment, setSendingComment] = useState(false);
   const [commentError, setCommentError] = useState("");
   const [editorInstance, setEditorInstance] = useState(0);
+  const [comments, setComments] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsError, setCommentsError] = useState("");
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -65,6 +70,38 @@ export default function TicketDetailsDialog({
     ticket?.ticketId ?? ticket?._id ?? ticket?.key ?? ticketKey;
   const commentTicketType =
     ticketType === "test" ? "TEST" : ticketType === "bug" ? "BUG" : "DEV";
+
+  useEffect(() => {
+    if (!ticket || !commentTicketId) return undefined;
+
+    let active = true;
+
+    async function loadComments() {
+      setCommentsLoading(true);
+      setCommentsError("");
+
+      try {
+        const ticketComments = await getTicketComments(commentTicketId);
+        if (active) setComments(ticketComments);
+      } catch (error) {
+        if (active) {
+          setCommentsError(
+            error.response?.data?.message ||
+              error.message ||
+              "Unable to load ticket comments."
+          );
+        }
+      } finally {
+        if (active) setCommentsLoading(false);
+      }
+    }
+
+    loadComments();
+
+    return () => {
+      active = false;
+    };
+  }, [commentTicketId, ticket]);
 
   const handleOpenComments = async () => {
     setShowPreviousRevisions(false);
@@ -94,6 +131,16 @@ export default function TicketDetailsDialog({
     try {
       await addTicketComment(commentTicketId, commentTicketType, delta);
       setEditorInstance((current) => current + 1);
+      try {
+        setComments(await getTicketComments(commentTicketId));
+        setCommentsError("");
+      } catch (error) {
+        setCommentsError(
+          error.response?.data?.message ||
+            error.message ||
+            "Comment was added, but the comment list could not be refreshed."
+        );
+      }
     } catch (error) {
       setCommentError(
         error.response?.data?.message ||
@@ -282,8 +329,19 @@ export default function TicketDetailsDialog({
                 {editError}
               </p>
             )}
-            <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <article className="overflow-y-auto border-b border-slate-200 p-5 md:border-b-0 md:border-r sm:p-7">
+            <div
+              className={`grid min-h-0 flex-1 ${
+                showComments && !isTestTicket
+                  ? "grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
+                  : "md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
+              }`}
+            >
+            <article
+              className={`overflow-y-auto border-b border-slate-200 p-5 sm:p-7 md:border-b-0 md:border-r ${
+                showComments && !isTestTicket ? "min-h-0" : ""
+              }`}
+            >
+              <div>
               {isEditing && isTestTicket ? (
                 <form
                   id="edit-ticket-form"
@@ -604,6 +662,62 @@ export default function TicketDetailsDialog({
                   </dd>
                 </div>
               </dl>}
+              </div>
+
+              {showComments && !isTestTicket && (
+                <div className="mt-6 border-t border-slate-200 pt-4">
+                  <h3 className="mb-2 text-sm font-bold text-slate-900">
+                    Add a comment
+                  </h3>
+                  {mentionsLoading && (
+                    <div className="flex min-h-24 items-center justify-center gap-2 text-sm text-slate-500">
+                      <LoaderCircle
+                        size={18}
+                        className="animate-spin text-blue-600"
+                      />
+                      Loading mention options...
+                    </div>
+                  )}
+                  {mentionsError && (
+                    <div className="space-y-3">
+                      <p
+                        role="alert"
+                        className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                      >
+                        {mentionsError}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleOpenComments}
+                        className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                  {!mentionsLoading && !mentionsError && requiredMentions && (
+                    <div>
+                      <div className="overflow-hidden rounded-lg border border-slate-200">
+                        <Editor
+                          key={editorInstance}
+                          requiredMentions={requiredMentions}
+                          onSubmitDelta={handleSubmitComment}
+                          submitting={sendingComment}
+                          compact
+                        />
+                      </div>
+                      {commentError && (
+                        <p
+                          role="alert"
+                          className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                        >
+                          {commentError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </article>
 
             {showComments && !isTestTicket ? (
@@ -627,52 +741,59 @@ export default function TicketDetailsDialog({
                   </button>
                 </div>
 
-                {mentionsLoading && (
-                  <div className="flex min-h-24 items-center justify-center gap-2 text-sm text-slate-500">
-                    <LoaderCircle
-                      size={18}
-                      className="animate-spin text-blue-600"
-                    />
-                    Loading mention options...
-                  </div>
-                )}
-                {mentionsError && (
-                  <div className="space-y-3">
-                    <p
-                      role="alert"
-                      className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                    >
-                      {mentionsError}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleOpenComments}
-                      className="text-sm font-semibold text-blue-700 hover:text-blue-800"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-                {!mentionsLoading && !mentionsError && requiredMentions && (
-                  <>
-                    <div className="overflow-x-auto rounded-lg border border-slate-200">
-                      <Editor
-                        key={editorInstance}
-                        requiredMentions={requiredMentions}
-                        onSubmitDelta={handleSubmitComment}
-                        submitting={sendingComment}
-                      />
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-slate-800">
+                          Ticket comments
+                        </h4>
+                        {commentsLoading && (
+                          <LoaderCircle
+                            size={15}
+                            className="animate-spin text-blue-600"
+                          />
+                        )}
+                      </div>
+                      {commentsError && (
+                        <p
+                          role="alert"
+                          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                        >
+                          {commentsError}
+                        </p>
+                      )}
+                      {!commentsLoading &&
+                        !commentsError &&
+                        comments.length === 0 && (
+                          <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">
+                            No comments yet.
+                          </p>
+                        )}
+                      {comments.map((item) => (
+                        <article
+                          key={item.commentId}
+                          className="rounded-lg border border-slate-200 bg-white"
+                        >
+                          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
+                            <span className="text-sm font-semibold text-slate-800">
+                              {item.user?.userName ?? "Unknown user"}
+                            </span>
+                            <time
+                              dateTime={item.time}
+                              className="text-xs text-slate-500"
+                            >
+                              {item.time
+                                ? new Date(item.time).toLocaleString()
+                                : ""}
+                            </time>
+                          </header>
+                          <div className="overflow-x-auto [&>div]:!justify-start [&>div>div]:!w-full [&>div>div]:!max-w-full [&>div>div]:!p-3 [&>div>div]:!text-sm">
+                            <Renderer delta={item.comment.delta} />
+                          </div>
+                        </article>
+                      ))}
                     </div>
-                    {commentError && (
-                      <p
-                        role="alert"
-                        className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                      >
-                        {commentError}
-                      </p>
-                    )}
-                  </>
-                )}
+                </div>
               </section>
             ) : showPreviousRevisions ? (
               <section

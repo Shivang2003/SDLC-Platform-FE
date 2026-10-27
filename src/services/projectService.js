@@ -9,6 +9,14 @@ export const createOrganizationProject = async (organizationId, project) => {
   return response.data;
 };
 
+export const addProjectMember = async (projectId, member) => {
+  const response = await api.post(
+    `/project/${projectId}/add-member`,
+    member
+  );
+  return response.data;
+};
+
 export const getOrganizationProjects = async (organizationId) => {
   const response = await api.get(
     `/organization/${organizationId}/projects`
@@ -129,6 +137,27 @@ export const addTicketComment = async (ticketId, ticketType, delta) => {
     comment: { delta },
   });
   return response.data;
+};
+
+export const getTicketComments = async (ticketId) => {
+  const response = await api.get(
+    `/comment/${encodeURIComponent(ticketId)}`
+  );
+  const data = response.data;
+
+  if (
+    !Array.isArray(data?.comments) ||
+    data.comments.some(
+      (item) =>
+        !item?.comment?.delta ||
+        !Array.isArray(item.comment.delta.ops) ||
+        typeof item.commentId !== "string"
+    )
+  ) {
+    throw new Error("Unexpected response while loading ticket comments.");
+  }
+
+  return data.comments;
 };
 
 export const getFeatureDevTickets = async (projectId, featureId) => {

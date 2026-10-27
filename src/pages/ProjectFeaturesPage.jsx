@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Layers3, LoaderCircle, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  Layers3,
+  LoaderCircle,
+  Plus,
+  UserPlus,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   useLocation,
@@ -13,7 +19,10 @@ import TicketDetailsDialog from "../components/projects/TicketDetailsDialog";
 import TicketBoard from "../components/projects/TicketBoard";
 import ProjectFeaturePanel from "../components/projects/ProjectFeaturePanel";
 import CreateFeatureDialog from "../components/projects/CreateFeatureDialog";
+import AddMemberDialog from "../components/shared/AddMemberDialog";
+import { getAllUsers } from "../services/organizationService";
 import {
+  addProjectMember,
   createProjectFeature,
   createDevTicket,
   createTestTicket,
@@ -56,6 +65,12 @@ export default function ProjectFeaturesPage() {
   const [createFeatureDialogOpen, setCreateFeatureDialogOpen] = useState(false);
   const [creatingFeature, setCreatingFeature] = useState(false);
   const [createFeatureError, setCreateFeatureError] = useState("");
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [availableUsersLoading, setAvailableUsersLoading] = useState(false);
+  const [availableUsersError, setAvailableUsersError] = useState("");
+  const [addingProjectMember, setAddingProjectMember] = useState(false);
+  const [addProjectMemberError, setAddProjectMemberError] = useState("");
   const [ticketStatuses, setTicketStatuses] = useState([]);
   const [devTickets, setDevTickets] = useState([]);
   const [ticketView, setTicketView] = useState("development");
@@ -168,6 +183,44 @@ export default function ProjectFeaturesPage() {
       );
     } finally {
       setCreatingFeature(false);
+    }
+  };
+
+  const handleOpenAddProjectMember = async () => {
+    setAddMemberDialogOpen(true);
+    setAvailableUsersLoading(true);
+    setAvailableUsersError("");
+    setAddProjectMemberError("");
+
+    try {
+      setAvailableUsers(await getAllUsers());
+    } catch (error) {
+      setAvailableUsersError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to load users."
+      );
+    } finally {
+      setAvailableUsersLoading(false);
+    }
+  };
+
+  const handleAddProjectMember = async (member) => {
+    setAddingProjectMember(true);
+    setAddProjectMemberError("");
+
+    try {
+      await addProjectMember(projectId, member);
+      setAddMemberDialogOpen(false);
+      toast.success(`${member.userName} added to the project.`);
+    } catch (error) {
+      setAddProjectMemberError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to add this project member."
+      );
+    } finally {
+      setAddingProjectMember(false);
     }
   };
 
@@ -573,12 +626,20 @@ export default function ProjectFeaturesPage() {
 
       <div className="mb-5 mt-10 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-900">Features</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {!featuresLoading && !featuresError && (
             <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
               {features.length} {features.length === 1 ? "feature" : "features"}
             </span>
           )}
+          <button
+            type="button"
+            onClick={handleOpenAddProjectMember}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            <UserPlus size={17} />
+            Add member
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -706,6 +767,18 @@ export default function ProjectFeaturesPage() {
           onSubmit={handleCreateFeature}
           submitting={creatingFeature}
           error={createFeatureError}
+        />
+      )}
+
+      {addMemberDialogOpen && (
+        <AddMemberDialog
+          users={availableUsers}
+          usersLoading={availableUsersLoading}
+          usersError={availableUsersError}
+          submitting={addingProjectMember}
+          submitError={addProjectMemberError}
+          onClose={() => setAddMemberDialogOpen(false)}
+          onSubmit={handleAddProjectMember}
         />
       )}
 
