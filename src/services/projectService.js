@@ -345,3 +345,25 @@ export const getTestTicketDetails = async (ticketKey) => {
 
   throw new Error("Unexpected response while loading test ticket details.");
 };
+
+export const createManualBugTicket = async (testTicketId, bug) => {
+  const response = await api.post(
+    `/test-ticket/${encodeURIComponent(testTicketId)}/create-manual-bugs`,
+    bug
+  );
+
+  return response.data;
+};
+
+export const getBugTicketDetails = async (bugId) => {
+  const response = await api.get(
+    `/bug/${encodeURIComponent(bugId)}/details`
+  );
+  const data = response.data?.data ?? response.data;
+
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Unexpected response while loading bug ticket details.");
+  }
+
+  return data;
+};

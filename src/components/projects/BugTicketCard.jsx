@@ -1,6 +1,22 @@
-export default function BugTicketCard({ ticket }) {
+export default function BugTicketCard({ ticket, onClick }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <article
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick?.();
+        }
+      }}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      className={`rounded-lg border border-slate-200 bg-white p-4 shadow-sm ${
+        onClick
+          ? "cursor-pointer transition hover:border-blue-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-500"
+          : ""
+      }`}
+      aria-label={onClick ? `View bug ${ticket.key}: ${ticket.title}` : undefined}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-rose-700">{ticket.key}</p>

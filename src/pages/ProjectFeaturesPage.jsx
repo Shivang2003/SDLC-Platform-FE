@@ -50,6 +50,7 @@ export default function ProjectFeaturesPage() {
   const projectName =
     project?.name ?? project?.projectName ?? "Project features";
   const selectedTicketKey = searchParams.get("ticket") ?? "";
+  const selectedBugKey = searchParams.get("bug") ?? "";
   const selectedTicketType =
     searchParams.get("ticketType") === "test" ? "test" : "development";
 
@@ -347,6 +348,7 @@ export default function ProjectFeaturesPage() {
       const next = new URLSearchParams(current);
       next.delete("ticket");
       next.delete("ticketType");
+      next.delete("bug");
       return next;
     });
     setTicketDetails(null);
@@ -361,12 +363,29 @@ export default function ProjectFeaturesPage() {
       const next = new URLSearchParams(current);
       next.set("ticket", ticketKey);
       next.set("ticketType", ticketType);
+      next.delete("bug");
       return next;
     });
     setTicketEditError("");
     setTicketRevisions([]);
     setTicketRevisionsError("");
     setRevisionsLoadedForKey("");
+  };
+
+  const handleBugClick = (bugKey) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("bug", bugKey);
+      return next;
+    });
+  };
+
+  const handleCloseBugDetails = () => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("bug");
+      return next;
+    });
   };
 
   const handleLoadTicketRevisions = async (forceRefresh = false) => {
@@ -809,6 +828,7 @@ export default function ProjectFeaturesPage() {
           key={`${selectedTicketType}:${selectedTicketKey}`}
           ticketType={selectedTicketType}
           ticketKey={selectedTicketKey}
+          selectedBugKey={selectedBugKey}
           projectId={projectId}
           loading={ticketDetailsLoading}
           error={ticketDetailsError}
@@ -824,6 +844,11 @@ export default function ProjectFeaturesPage() {
           onEdit={handleLoadEditAssignees}
           onSaveEdit={handleSaveTicketEdit}
           onShowRevisions={handleLoadTicketRevisions}
+          onBugCreated={() =>
+            setTicketDetailsRefresh((current) => current + 1)
+          }
+          onBugClick={handleBugClick}
+          onCloseBugDetails={handleCloseBugDetails}
         />
       )}
     </section>

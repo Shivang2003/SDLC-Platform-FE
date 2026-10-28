@@ -5,12 +5,16 @@ import {
   MessageSquareText,
   Pencil,
   Save,
+  Plus,
   X,
 } from "lucide-react";
 import Editor from "../editor/MentionEditor";
 import {
   addTicketComment,
+  createManualBugTicket,
+  getBugTicketDetails,
   getProjectMentions,
+  getProjectMembers,
   getTicketComments,
 } from "../../services/projectService";
 import Renderer from "../editor/MentionRenderer";
@@ -37,6 +41,30 @@ const getAssignedToLabel = (assignedTo) => {
   );
 };
 
+const createEmptyBugForm = () => ({
+  title: "",
+  description: "",
+  stepsToReproduce: "",
+  expectedResult: "",
+  actualResult: "",
+  assignee: "",
+  status: "OPEN",
+  priority: "MEDIUM",
+  severity: "MEDIUM",
+});
+
+const bugStatuses = [
+  "OPEN",
+  "IN_PROGRESS",
+  "FIXED",
+  "READY_FOR_RETEST",
+  "VERIFIED",
+  "REOPENED",
+  "CLOSED",
+  "WONT_FIX",
+];
+const bugPriorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+
 export default function TicketDetailsDialog({
   ticketType,
   ticketKey,
@@ -55,6 +83,10 @@ export default function TicketDetailsDialog({
   onEdit,
   onSaveEdit,
   onShowRevisions,
+  onBugCreated,
+  selectedBugKey = "",
+  onBugClick,
+  onCloseBugDetails,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState(null);
@@ -68,6 +100,15 @@ export default function TicketDetailsDialog({
   const [comments, setComments] = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState("");
+  const [creatingBug, setCreatingBug] = useState(false);
+  const [bugForm, setBugForm] = useState(createEmptyBugForm);
+  const [bugAssignees, setBugAssignees] = useState([]);
+  const [bugAssigneesLoading, setBugAssigneesLoading] = useState(false);
+  const [bugFormError, setBugFormError] = useState("");
+  const [bugSubmitError, setBugSubmitError] = useState("");
+  const [savingBug, setSavingBug] = useState(false);
+  const [bugDetailsRefresh, setBugDetailsRefresh] = useState(0);
+  const [bugDetailsResult, setBugDetailsResult] = useState(null);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -101,6 +142,14 @@ export default function TicketDetailsDialog({
   const mentionsLoading = Boolean(
     ticket && commentTicketId && !currentMentionsResult
   );
+  const bugDetailsRequestKey = `${selectedBugKey}:${bugDetailsRefresh}`;
+  const currentBugDetailsResult =
+    bugDetailsResult?.requestKey === bugDetailsRequestKey
+      ? bugDetailsResult
+      : null;
+  const bugDetails = currentBugDetailsResult?.data ?? null;
+  const bugDetailsError = currentBugDetailsResult?.error ?? "";
+  const bugDetailsLoading = Boolean(selectedBugKey && !currentBugDetailsResult);
 
   useEffect(() => {
     if (!ticket || !commentTicketId) return undefined;
@@ -164,10 +213,99 @@ export default function TicketDetailsDialog({
     };
   }, [projectId, commentTicketId, ticket, mentionsRefresh]);
 
+  useEffect(() => {
+    if (!selectedBugKey) return undefined;
+
+    let active = true;
+    const requestKey = `${selectedBugKey}:${bugDetailsRefresh}`;
+
+    async function loadBugDetails() {
+      try {
+        const data = await getBugTicketDetails(selectedBugKey);
+        if (active) setBugDetailsResult({ requestKey, data });
+      } catch (error) {
+        if (active) {
+          setBugDetailsResult({
+            requestKey,
+            error:
+              error.response?.data?.message ||
+              error.message ||
+              "Unable to load bug ticket details.",
+          });
+        }
+      }
+    }
+
+    loadBugDetails();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedBugKey, bugDetailsRefresh]);
+
   const handleOpenComments = () => {
     setShowPreviousRevisions(false);
     setShowComments(true);
     setCommentError("");
+  };
+
+  const handleOpenCreateBug = async () => {
+    setShowComments(false);
+    setShowPreviousRevisions(false);
+    onCloseBugDetails?.();
+    setCreatingBug(true);
+    setBugFormError("");
+    setBugSubmitError("");
+    setBugAssigneesLoading(true);
+
+    try {
+      const members = await getProjectMembers(projectId);
+      const usernames = members.map(getAssignedToLabel).filter(Boolean);
+      setBugAssignees(usernames);
+      setBugForm((current) => ({
+        ...current,
+        assignee: usernames[0] ?? "",
+      }));
+    } catch (error) {
+      setBugFormError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to load project members."
+      );
+    } finally {
+      setBugAssigneesLoading(false);
+    }
+  };
+
+  const handleCreateBug = async (event) => {
+    event.preventDefault();
+    const testTicketId =
+      ticket?.ticketId ?? ticket?._id ?? ticket?.id ?? ticket?.key ?? ticketKey;
+    setSavingBug(true);
+    setBugSubmitError("");
+
+    try {
+      await createManualBugTicket(testTicketId, bugForm);
+      setCreatingBug(false);
+      setBugForm(createEmptyBugForm());
+      onBugCreated?.();
+    } catch (error) {
+      setBugSubmitError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to create the bug ticket."
+      );
+    } finally {
+      setSavingBug(false);
+    }
+  };
+
+  const handleOpenBugDetails = (bugKey) => {
+    onBugClick?.(bugKey);
+  };
+
+  const handleCloseBugDetails = () => {
+    onCloseBugDetails?.();
   };
 
   const handleSubmitComment = async (delta) => {
@@ -939,14 +1077,310 @@ export default function TicketDetailsDialog({
                     {relatedTickets.length === 1 ? "ticket" : "tickets"}
                   </p>
                 </div>
+                {isTestTicket && (
+                  <button
+                    type="button"
+                    onClick={handleOpenCreateBug}
+                    disabled={bugAssigneesLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {bugAssigneesLoading ? (
+                      <LoaderCircle size={15} className="animate-spin" />
+                    ) : (
+                      <Plus size={15} />
+                    )}
+                    Create Bug
+                  </button>
+                )}
               </div>
 
+              {creatingBug && !selectedBugKey && (
+                <form
+                  onSubmit={handleCreateBug}
+                  className="mb-4 max-h-[calc(100vh-10rem)] space-y-4 overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-slate-50 p-4"
+                >
+                  {bugAssigneesLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <LoaderCircle
+                        size={16}
+                        className="animate-spin text-blue-600"
+                      />
+                      Loading project members...
+                    </div>
+                  ) : bugFormError ? (
+                    <div>
+                      <p role="alert" className="text-sm text-red-700">
+                        {bugFormError}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleOpenCreateBug}
+                        className="mt-2 text-sm font-semibold text-blue-700 hover:text-blue-800"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="block">
+                        <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                          Title
+                        </span>
+                        <input
+                          required
+                          maxLength={200}
+                          value={bugForm.title}
+                          onChange={(event) =>
+                            setBugForm((current) => ({
+                              ...current,
+                              title: event.target.value,
+                            }))
+                          }
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                          Description
+                        </span>
+                        <textarea
+                          required
+                          rows={2}
+                          value={bugForm.description}
+                          onChange={(event) =>
+                            setBugForm((current) => ({
+                              ...current,
+                              description: event.target.value,
+                            }))
+                          }
+                          className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                          Steps to reproduce
+                        </span>
+                        <textarea
+                          required
+                          rows={2}
+                          value={bugForm.stepsToReproduce}
+                          onChange={(event) =>
+                            setBugForm((current) => ({
+                              ...current,
+                              stepsToReproduce: event.target.value,
+                            }))
+                          }
+                          className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        />
+                      </label>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {[
+                          ["expectedResult", "Expected result"],
+                          ["actualResult", "Actual result"],
+                        ].map(([field, label]) => (
+                          <label key={field} className="block">
+                            <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                              {label}
+                            </span>
+                            <textarea
+                              required
+                              rows={2}
+                              value={bugForm[field]}
+                              onChange={(event) =>
+                                setBugForm((current) => ({
+                                  ...current,
+                                  [field]: event.target.value,
+                                }))
+                              }
+                              className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                            Assignee
+                          </span>
+                          <select
+                            required
+                            value={bugForm.assignee}
+                            onChange={(event) =>
+                              setBugForm((current) => ({
+                                ...current,
+                                assignee: event.target.value,
+                              }))
+                            }
+                            disabled={bugAssignees.length === 0}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          >
+                            {bugAssignees.length === 0 && (
+                              <option value="">No project members</option>
+                            )}
+                            {bugAssignees.map((assignee) => (
+                              <option key={assignee} value={assignee}>
+                                {assignee}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {[
+                          ["status", "Status", bugStatuses],
+                          ["priority", "Priority", bugPriorities],
+                          ["severity", "Severity", bugPriorities],
+                        ].map(([field, label, options]) => (
+                          <label key={field} className="block">
+                            <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                              {label}
+                            </span>
+                            <select
+                              value={bugForm[field]}
+                              onChange={(event) =>
+                                setBugForm((current) => ({
+                                  ...current,
+                                  [field]: event.target.value,
+                                }))
+                              }
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                            >
+                              {options.map((option) => (
+                                <option key={option} value={option}>
+                                  {option.replaceAll("_", " ")}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ))}
+                      </div>
+                      {bugAssignees.length === 0 && (
+                        <p className="text-sm text-amber-800">
+                          Add a project member before creating a bug.
+                        </p>
+                      )}
+                      {bugSubmitError && (
+                        <p role="alert" className="text-sm text-red-700">
+                          {bugSubmitError}
+                        </p>
+                      )}
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setCreatingBug(false)}
+                          disabled={savingBug}
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={savingBug || bugAssignees.length === 0}
+                          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {savingBug && (
+                            <LoaderCircle
+                              size={15}
+                              className="animate-spin"
+                            />
+                          )}
+                          Create Bug
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </form>
+              )}
+
+              {selectedBugKey ? (
+                <section className="min-h-0 flex-1 overflow-y-auto p-1">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h4 className="text-base font-bold text-slate-900">
+                      Bug details
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={handleCloseBugDetails}
+                      className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                    >
+                      Back to bug tickets
+                    </button>
+                  </div>
+                  {bugDetailsLoading && (
+                    <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-slate-500">
+                      <LoaderCircle
+                        size={18}
+                        className="animate-spin text-blue-600"
+                      />
+                      Loading bug details...
+                    </div>
+                  )}
+                  {bugDetailsError && (
+                    <div className="space-y-2">
+                      <p role="alert" className="text-sm text-red-700">
+                        {bugDetailsError}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBugDetailsRefresh((current) => current + 1)
+                        }
+                        className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                  {!bugDetailsLoading && !bugDetailsError && bugDetails && (
+                    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-rose-700">
+                            {bugDetails.key}
+                          </p>
+                          <h5 className="mt-2 break-words text-lg font-bold text-slate-900">
+                            {bugDetails.title}
+                          </h5>
+                        </div>
+                        <span className="rounded bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">
+                          {bugDetails.priority}
+                        </span>
+                      </div>
+
+                      <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                        {bugDetails.description || "No description provided."}
+                      </p>
+
+                      <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+                        {[
+                          ["Steps to reproduce", bugDetails.stepsToReproduce],
+                          ["Expected result", bugDetails.expectedResult],
+                          ["Actual result", bugDetails.actualResult],
+                          ["Status", bugDetails.status?.replaceAll("_", " ")],
+                          ["Severity", bugDetails.severity],
+                          ["Revision", bugDetails.currentRevision],
+                          ["Project", bugDetails.projectName],
+                          ["Feature", bugDetails.featureName],
+                        ].map(([label, value]) => (
+                          <div key={label}>
+                            <dt className="text-xs font-medium text-slate-500">
+                              {label}
+                            </dt>
+                            <dd className="mt-1 whitespace-pre-wrap break-words font-semibold text-slate-800">
+                              {value ?? "—"}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </article>
+                  )}
+                </section>
+              ) : (
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                 {relatedTickets.map((relatedTicket) =>
                   isTestTicket ? (
                     <BugTicketCard
                       key={relatedTicket.key}
                       ticket={relatedTicket}
+                      onClick={() => handleOpenBugDetails(relatedTicket.key)}
                     />
                   ) : (
                     <TestTicketCard
@@ -969,6 +1403,7 @@ export default function TicketDetailsDialog({
                   </p>
                 )}
               </div>
+              )}
             </section>}
             </div>
           </div>
