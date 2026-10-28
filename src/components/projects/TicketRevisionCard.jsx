@@ -19,6 +19,23 @@ export default function TicketRevisionCard({ revision }) {
         {revision.description || "No description provided."}
       </p>
 
+      {Array.isArray(revision.changedFields) &&
+        revision.changedFields.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-semibold text-slate-900">
+              Changed fields:
+            </span>
+            {revision.changedFields.map((field) => (
+              <span
+                key={field}
+                className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 font-semibold text-red-700"
+              >
+                {field}
+              </span>
+            ))}
+          </div>
+        )}
+
       <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-medium">
         {revision.status && (
           <span className="rounded bg-slate-100 px-2 py-1 text-slate-600">

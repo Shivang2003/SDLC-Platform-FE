@@ -13,6 +13,7 @@ const priorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 export default function CreateTestTicketDialog({
   devTickets,
+  assignees,
   onClose,
   onSubmit,
   submitting,
@@ -21,6 +22,9 @@ export default function CreateTestTicketDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [devTicketId, setDevTicketId] = useState(devTickets[0]?.key ?? "");
+  const [assigneeUserName, setAssigneeUserName] = useState(
+    assignees[0] ?? ""
+  );
   const [testCaseStatus, setTestCaseStatus] = useState("DRAFT");
   const [executionStatus, setExecutionStatus] = useState("NOT_EXECUTED");
   const [priority, setPriority] = useState("MEDIUM");
@@ -42,6 +46,7 @@ export default function CreateTestTicketDialog({
       testCaseStatus,
       executionStatus,
       priority,
+      assignee: assigneeUserName,
     });
   };
 
@@ -99,6 +104,28 @@ export default function CreateTestTicketDialog({
               {devTickets.map((ticket) => (
                 <option key={ticket.key} value={ticket.key}>
                   {ticket.key} - {ticket.title}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">
+              Assignee
+            </span>
+            <select
+              required
+              value={assigneeUserName}
+              onChange={(event) => setAssigneeUserName(event.target.value)}
+              disabled={assignees.length === 0}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              {assignees.length === 0 && (
+                <option value="">No project members</option>
+              )}
+              {assignees.map((member) => (
+                <option key={member} value={member}>
+                  {member}
                 </option>
               ))}
             </select>
@@ -199,6 +226,12 @@ export default function CreateTestTicketDialog({
             </p>
           )}
 
+          {assignees.length === 0 && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Add a project member before creating a test ticket.
+            </p>
+          )}
+
           <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
             <button
               type="button"
@@ -210,7 +243,9 @@ export default function CreateTestTicketDialog({
             </button>
             <button
               type="submit"
-              disabled={submitting || devTickets.length === 0}
+              disabled={
+                submitting || devTickets.length === 0 || assignees.length === 0
+              }
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting && (

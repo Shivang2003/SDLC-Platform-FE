@@ -903,12 +903,17 @@ export default function TicketDetailsDialog({
                 )}
                 {!revisionsLoading && !revisionsError && (
                   <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-                    {revisions.map((revision) => (
+                    {[...revisions]
+                      .sort(
+                        (first, second) =>
+                          second.revisionNumber - first.revisionNumber
+                      )
+                      .map((revision) => (
                       <TicketRevisionCard
                         key={revision.revisionNumber}
                         revision={revision}
                       />
-                    ))}
+                      ))}
                     {revisions.length === 0 && (
                       <p className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
                         No previous revisions found.

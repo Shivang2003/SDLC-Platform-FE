@@ -553,19 +553,20 @@ export default function ProjectFeaturesPage() {
     setCreateTestTicketError("");
 
     try {
-      const ticketMap = await getFeatureDevTicketOptions(
-        projectId,
-        selectedFeatureId
-      );
+      const [ticketMap, members] = await Promise.all([
+        getFeatureDevTicketOptions(projectId, selectedFeatureId),
+        getProjectMembers(projectId),
+      ]);
       setDevTicketOptions(
         Object.entries(ticketMap).map(([key, title]) => ({ key, title }))
       );
+      setProjectMembers(members);
       setCreateTestDialogOpen(true);
     } catch (error) {
       setDevTicketOptionsError(
         error.response?.data?.message ||
           error.message ||
-          "Unable to load development tickets."
+          "Unable to load development tickets and project members."
       );
     } finally {
       setLoadingDevTicketOptions(false);
@@ -795,6 +796,7 @@ export default function ProjectFeaturesPage() {
       {createTestDialogOpen && (
         <CreateTestTicketDialog
           devTickets={devTicketOptions}
+          assignees={projectMembers}
           submitting={creatingTestTicket}
           error={createTestTicketError}
           onClose={() => setCreateTestDialogOpen(false)}
