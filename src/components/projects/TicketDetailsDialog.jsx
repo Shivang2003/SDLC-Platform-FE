@@ -967,7 +967,7 @@ export default function TicketDetailsDialog({
                         !commentsError &&
                         comments.length === 0 && (
                           <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">
-                            No comments yet.
+                            No comments on this ticket.
                           </p>
                         )}
                       {comments.map((item) => (

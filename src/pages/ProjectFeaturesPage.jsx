@@ -216,6 +216,7 @@ export default function ProjectFeaturesPage() {
       toast.success(`${member.userName} added to the project.`);
     } catch (error) {
       setAddProjectMemberError(
+        error.response?.data?.error ||
         error.response?.data?.message ||
           error.message ||
           "Unable to add this project member."

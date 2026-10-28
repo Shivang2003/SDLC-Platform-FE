@@ -82,6 +82,7 @@ export default function ProjectsPage() {
       toast.success(`${member.userName} added to the organization.`);
     } catch (error) {
       setAddMemberError(
+        error.response?.data?.error ||
         error.response?.data?.message ||
           error.message ||
           "Unable to add this organization member."

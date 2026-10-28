@@ -153,9 +153,7 @@ export const getTicketComments = async (ticketId) => {
         !Array.isArray(item.comment.delta.ops) ||
         typeof item.commentId !== "string"
     )
-  ) {
-    throw new Error("Unexpected response while loading ticket comments.");
-  }
+  ) return [];
 
   return data.comments;
 };
