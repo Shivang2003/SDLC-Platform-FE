@@ -14,6 +14,7 @@ import TicketCommentComposer from "./TicketCommentComposer";
 import TicketCommentList from "./TicketCommentList";
 import BugTicketDetailsPanel from "./BugTicketDetailsPanel";
 import CreateManualBugForm from "./CreateManualBugForm";
+import CreateAutomatedBugDocsDialog from "./CreateAutomatedBugDocsDialog";
 import TicketRevisionPanel from "./TicketRevisionPanel";
 import useTicketComments from "../../hooks/useTicketComments";
 
@@ -64,6 +65,7 @@ export default function TicketDetailsDialog({
   const [showPreviousRevisions, setShowPreviousRevisions] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [creatingBug, setCreatingBug] = useState(false);
+  const [showAutomatedBugDocs, setShowAutomatedBugDocs] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -683,14 +685,23 @@ export default function TicketDetailsDialog({
                   </p>
                 </div>
                 {isTestTicket && (
-                  <button
-                    type="button"
-                    onClick={handleOpenCreateBug}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                  >
-                    <Plus size={15} />
-                    Create Bug
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenCreateBug}
+                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                    >
+                      <Plus size={15} />
+                      Create Bug
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAutomatedBugDocs(true)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                    >
+                      Create Automated Bug
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -754,6 +765,12 @@ export default function TicketDetailsDialog({
           </>
         )}
       </section>
+      {showAutomatedBugDocs && (
+        <CreateAutomatedBugDocsDialog
+          testTicketKey={ticket?.key ?? ticketKey}
+          onClose={() => setShowAutomatedBugDocs(false)}
+        />
+      )}
     </div>
   );
 }
