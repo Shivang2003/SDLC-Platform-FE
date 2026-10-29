@@ -8,19 +8,14 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import Editor from "../editor/MentionEditor";
-import {
-  addTicketComment,
-  createManualBugTicket,
-  getBugTicketDetails,
-  getProjectMentions,
-  getProjectMembers,
-  getTicketComments,
-} from "../../services/projectService";
-import Renderer from "../editor/MentionRenderer";
 import BugTicketCard from "./BugTicketCard";
 import TestTicketCard from "./TestTicketCard";
-import TicketRevisionCard from "./TicketRevisionCard";
+import TicketCommentComposer from "./TicketCommentComposer";
+import TicketCommentList from "./TicketCommentList";
+import BugTicketDetailsPanel from "./BugTicketDetailsPanel";
+import CreateManualBugForm from "./CreateManualBugForm";
+import TicketRevisionPanel from "./TicketRevisionPanel";
+import useTicketComments from "../../hooks/useTicketComments";
 
 const getAssignedToLabel = (assignedTo) => {
   if (typeof assignedTo === "string") return assignedTo;
@@ -40,30 +35,6 @@ const getAssignedToLabel = (assignedTo) => {
     ""
   );
 };
-
-const createEmptyBugForm = () => ({
-  title: "",
-  description: "",
-  stepsToReproduce: "",
-  expectedResult: "",
-  actualResult: "",
-  assignee: "",
-  status: "OPEN",
-  priority: "MEDIUM",
-  severity: "MEDIUM",
-});
-
-const bugStatuses = [
-  "OPEN",
-  "IN_PROGRESS",
-  "FIXED",
-  "READY_FOR_RETEST",
-  "VERIFIED",
-  "REOPENED",
-  "CLOSED",
-  "WONT_FIX",
-];
-const bugPriorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 export default function TicketDetailsDialog({
   ticketType,
@@ -92,23 +63,7 @@ export default function TicketDetailsDialog({
   const [editValues, setEditValues] = useState(null);
   const [showPreviousRevisions, setShowPreviousRevisions] = useState(false);
   const [showComments, setShowComments] = useState(false);
-  const [mentionsRefresh, setMentionsRefresh] = useState(0);
-  const [mentionsResult, setMentionsResult] = useState(null);
-  const [sendingComment, setSendingComment] = useState(false);
-  const [commentError, setCommentError] = useState("");
-  const [editorInstance, setEditorInstance] = useState(0);
-  const [comments, setComments] = useState([]);
-  const [commentsLoading, setCommentsLoading] = useState(false);
-  const [commentsError, setCommentsError] = useState("");
   const [creatingBug, setCreatingBug] = useState(false);
-  const [bugForm, setBugForm] = useState(createEmptyBugForm);
-  const [bugAssignees, setBugAssignees] = useState([]);
-  const [bugAssigneesLoading, setBugAssigneesLoading] = useState(false);
-  const [bugFormError, setBugFormError] = useState("");
-  const [bugSubmitError, setBugSubmitError] = useState("");
-  const [savingBug, setSavingBug] = useState(false);
-  const [bugDetailsRefresh, setBugDetailsRefresh] = useState(0);
-  const [bugDetailsResult, setBugDetailsResult] = useState(null);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -129,211 +84,30 @@ export default function TicketDetailsDialog({
     ticket?.ticketId ?? ticket?._id ?? ticket?.key ?? ticketKey;
   const commentTicketType =
     ticketType === "test" ? "TEST" : ticketType === "bug" ? "BUG" : "DEV";
+  const ticketComments = useTicketComments(
+    projectId,
+    ticket ? commentTicketId : "",
+    commentTicketType
+  );
   const assignedToLabel =
     getAssignedToLabel(ticket?.assignedTo) ||
     ticket?.assigneeUserName ||
     getAssignedToLabel(ticket?.assignee) ||
     "Unassigned";
-  const mentionsRequestKey = `${projectId}:${commentTicketId}:${mentionsRefresh}`;
-  const currentMentionsResult =
-    mentionsResult?.requestKey === mentionsRequestKey ? mentionsResult : null;
-  const requiredMentions = currentMentionsResult?.data ?? null;
-  const mentionsError = currentMentionsResult?.error ?? "";
-  const mentionsLoading = Boolean(
-    ticket && commentTicketId && !currentMentionsResult
-  );
-  const bugDetailsRequestKey = `${selectedBugKey}:${bugDetailsRefresh}`;
-  const currentBugDetailsResult =
-    bugDetailsResult?.requestKey === bugDetailsRequestKey
-      ? bugDetailsResult
-      : null;
-  const bugDetails = currentBugDetailsResult?.data ?? null;
-  const bugDetailsError = currentBugDetailsResult?.error ?? "";
-  const bugDetailsLoading = Boolean(selectedBugKey && !currentBugDetailsResult);
-
-  useEffect(() => {
-    if (!ticket || !commentTicketId) return undefined;
-
-    let active = true;
-
-    async function loadComments() {
-      setCommentsLoading(true);
-      setCommentsError("");
-
-      try {
-        const ticketComments = await getTicketComments(commentTicketId);
-        if (active) setComments(ticketComments);
-      } catch (error) {
-        if (active) {
-          setCommentsError(
-            error.response?.data?.message ||
-              error.message ||
-              "Unable to load ticket comments."
-          );
-        }
-      } finally {
-        if (active) setCommentsLoading(false);
-      }
-    }
-
-    loadComments();
-
-    return () => {
-      active = false;
-    };
-  }, [commentTicketId, ticket]);
-
-  useEffect(() => {
-    if (!ticket || !projectId) return undefined;
-
-    let active = true;
-    const requestKey = `${projectId}:${commentTicketId}:${mentionsRefresh}`;
-
-    async function loadMentions() {
-      try {
-        const mentions = await getProjectMentions(projectId);
-        if (active) setMentionsResult({ requestKey, data: mentions });
-      } catch (error) {
-        if (active) {
-          setMentionsResult({
-            requestKey,
-            error:
-              error.response?.data?.message ||
-              error.message ||
-              "Unable to load comment mentions.",
-          });
-        }
-      }
-    }
-
-    loadMentions();
-
-    return () => {
-      active = false;
-    };
-  }, [projectId, commentTicketId, ticket, mentionsRefresh]);
-
-  useEffect(() => {
-    if (!selectedBugKey) return undefined;
-
-    let active = true;
-    const requestKey = `${selectedBugKey}:${bugDetailsRefresh}`;
-
-    async function loadBugDetails() {
-      try {
-        const data = await getBugTicketDetails(selectedBugKey);
-        if (active) setBugDetailsResult({ requestKey, data });
-      } catch (error) {
-        if (active) {
-          setBugDetailsResult({
-            requestKey,
-            error:
-              error.response?.data?.message ||
-              error.message ||
-              "Unable to load bug ticket details.",
-          });
-        }
-      }
-    }
-
-    loadBugDetails();
-
-    return () => {
-      active = false;
-    };
-  }, [selectedBugKey, bugDetailsRefresh]);
-
   const handleOpenComments = () => {
     setShowPreviousRevisions(false);
     setShowComments(true);
-    setCommentError("");
   };
 
-  const handleOpenCreateBug = async () => {
+  const handleOpenCreateBug = () => {
     setShowComments(false);
     setShowPreviousRevisions(false);
     onCloseBugDetails?.();
     setCreatingBug(true);
-    setBugFormError("");
-    setBugSubmitError("");
-    setBugAssigneesLoading(true);
-
-    try {
-      const members = await getProjectMembers(projectId);
-      const usernames = members.map(getAssignedToLabel).filter(Boolean);
-      setBugAssignees(usernames);
-      setBugForm((current) => ({
-        ...current,
-        assignee: usernames[0] ?? "",
-      }));
-    } catch (error) {
-      setBugFormError(
-        error.response?.data?.message ||
-          error.message ||
-          "Unable to load project members."
-      );
-    } finally {
-      setBugAssigneesLoading(false);
-    }
-  };
-
-  const handleCreateBug = async (event) => {
-    event.preventDefault();
-    const testTicketId =
-      ticket?.ticketId ?? ticket?._id ?? ticket?.id ?? ticket?.key ?? ticketKey;
-    setSavingBug(true);
-    setBugSubmitError("");
-
-    try {
-      await createManualBugTicket(testTicketId, bugForm);
-      setCreatingBug(false);
-      setBugForm(createEmptyBugForm());
-      onBugCreated?.();
-    } catch (error) {
-      setBugSubmitError(
-        error.response?.data?.message ||
-          error.message ||
-          "Unable to create the bug ticket."
-      );
-    } finally {
-      setSavingBug(false);
-    }
   };
 
   const handleOpenBugDetails = (bugKey) => {
     onBugClick?.(bugKey);
-  };
-
-  const handleCloseBugDetails = () => {
-    onCloseBugDetails?.();
-  };
-
-  const handleSubmitComment = async (delta) => {
-    setSendingComment(true);
-    setCommentError("");
-
-    try {
-      await addTicketComment(commentTicketId, commentTicketType, delta);
-      setEditorInstance((current) => current + 1);
-      try {
-        setComments(await getTicketComments(commentTicketId));
-        setCommentsError("");
-      } catch (error) {
-        setCommentsError(
-          error.response?.data?.message ||
-            error.message ||
-            "Comment was added, but the comment list could not be refreshed."
-        );
-      }
-    } catch (error) {
-      setCommentError(
-        error.response?.data?.message ||
-          error.message ||
-          "Unable to add this comment."
-      );
-    } finally {
-      setSendingComment(false);
-    }
   };
 
   const updateTestTicketStatus = (testTicketKey, executionStatus) => {
@@ -812,60 +586,16 @@ export default function TicketDetailsDialog({
               </div>
 
               {showComments && (
-                <div className="mt-6 border-t border-slate-200 pt-4">
-                  <h3 className="mb-2 text-sm font-bold text-slate-900">
-                    Add a comment
-                  </h3>
-                  {mentionsLoading && (
-                    <div className="flex min-h-24 items-center justify-center gap-2 text-sm text-slate-500">
-                      <LoaderCircle
-                        size={18}
-                        className="animate-spin text-blue-600"
-                      />
-                      Loading mention options...
-                    </div>
-                  )}
-                  {mentionsError && (
-                    <div className="space-y-3">
-                      <p
-                        role="alert"
-                        className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                      >
-                        {mentionsError}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMentionsRefresh((current) => current + 1)
-                        }
-                        className="text-sm font-semibold text-blue-700 hover:text-blue-800"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  )}
-                  {!mentionsLoading && !mentionsError && requiredMentions && (
-                    <div>
-                      <div className="rounded-lg border border-slate-200">
-                        <Editor
-                          key={editorInstance}
-                          requiredMentions={requiredMentions}
-                          onSubmitDelta={handleSubmitComment}
-                          submitting={sendingComment}
-                          compact
-                        />
-                      </div>
-                      {commentError && (
-                        <p
-                          role="alert"
-                          className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                        >
-                          {commentError}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <TicketCommentComposer
+                  editorInstance={ticketComments.editorInstance}
+                  mentions={ticketComments.mentions}
+                  mentionsLoading={ticketComments.mentionsLoading}
+                  mentionsError={ticketComments.mentionsError}
+                  onRetryMentions={ticketComments.retryMentions}
+                  onSubmit={ticketComments.submitComment}
+                  sending={ticketComments.sending}
+                  submitError={ticketComments.submitError}
+                />
               )}
             </article>
 
@@ -922,144 +652,19 @@ export default function TicketDetailsDialog({
               </div>
 
             {showComments ? (
-              <section
-                aria-labelledby="ticket-comments-heading"
-                className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 sm:p-7"
-              >
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <h3
-                    id="ticket-comments-heading"
-                    className="text-base font-bold text-slate-900"
-                  >
-                    Comments
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowComments(false)}
-                    className="text-sm font-semibold text-blue-700 hover:text-blue-800"
-                  >
-                    Back to related tickets
-                  </button>
-                </div>
-
-                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold text-slate-800">
-                          Ticket comments
-                        </h4>
-                        {commentsLoading && (
-                          <LoaderCircle
-                            size={15}
-                            className="animate-spin text-blue-600"
-                          />
-                        )}
-                      </div>
-                      {commentsError && (
-                        <p
-                          role="alert"
-                          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                        >
-                          {commentsError}
-                        </p>
-                      )}
-                      {!commentsLoading &&
-                        !commentsError &&
-                        comments.length === 0 && (
-                          <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">
-                            No comments on this ticket.
-                          </p>
-                        )}
-                      {comments.map((item) => (
-                        <article
-                          key={item.commentId}
-                          className="rounded-lg border border-slate-200 bg-white"
-                        >
-                          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
-                            <span className="text-sm font-semibold text-slate-800">
-                              {item.user?.userName ?? "Unknown user"}
-                            </span>
-                            <time
-                              dateTime={item.time}
-                              className="text-xs text-slate-500"
-                            >
-                              {item.time
-                                ? new Date(item.time).toLocaleString()
-                                : ""}
-                            </time>
-                          </header>
-                          <div className="overflow-x-auto [&>div]:!justify-start [&>div>div]:!w-full [&>div>div]:!max-w-full [&>div>div]:!p-3 [&>div>div]:!text-sm">
-                            <Renderer delta={item.comment.delta} />
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                </div>
-              </section>
+              <TicketCommentList
+                comments={ticketComments.comments}
+                loading={ticketComments.commentsLoading}
+                error={ticketComments.commentsError}
+                onBack={() => setShowComments(false)}
+              />
             ) : showPreviousRevisions ? (
-              <section
-                aria-labelledby="previous-revisions-heading"
-                className="flex min-h-0 flex-1 flex-col p-5 sm:p-7"
-              >
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <h3
-                      id="previous-revisions-heading"
-                      className="text-base font-bold text-slate-900"
-                    >
-                      Previous revisions
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {revisions.length}{" "}
-                      {revisions.length === 1 ? "revision" : "revisions"}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowPreviousRevisions(false)}
-                    className="text-sm font-semibold text-blue-700 hover:text-blue-800"
-                  >
-                    Back to ticket details
-                  </button>
-                </div>
-                {revisionsLoading && (
-                  <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-slate-500">
-                    <LoaderCircle
-                      size={18}
-                      className="animate-spin text-blue-600"
-                    />
-                    Loading previous revisions...
-                  </div>
-                )}
-                {revisionsError && (
-                  <p
-                    role="alert"
-                    className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                  >
-                    {revisionsError}
-                  </p>
-                )}
-                {!revisionsLoading && !revisionsError && (
-                  <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-                    {[...revisions]
-                      .sort(
-                        (first, second) =>
-                          second.revisionNumber - first.revisionNumber
-                      )
-                      .map((revision) => (
-                      <TicketRevisionCard
-                        key={revision.revisionNumber}
-                        revision={revision}
-                      />
-                      ))}
-                    {revisions.length === 0 && (
-                      <p className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                        No previous revisions found.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </section>
+              <TicketRevisionPanel
+                revisions={revisions}
+                loading={revisionsLoading}
+                error={revisionsError}
+                onBack={() => setShowPreviousRevisions(false)}
+              />
             ) : <section
               aria-labelledby="test-tickets-heading"
               className="flex min-h-0 flex-1 flex-col p-5 sm:p-7"
@@ -1081,298 +686,37 @@ export default function TicketDetailsDialog({
                   <button
                     type="button"
                     onClick={handleOpenCreateBug}
-                    disabled={bugAssigneesLoading}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                   >
-                    {bugAssigneesLoading ? (
-                      <LoaderCircle size={15} className="animate-spin" />
-                    ) : (
-                      <Plus size={15} />
-                    )}
+                    <Plus size={15} />
                     Create Bug
                   </button>
                 )}
               </div>
 
               {creatingBug && !selectedBugKey && (
-                <form
-                  onSubmit={handleCreateBug}
-                  className="mb-4 max-h-[calc(100vh-10rem)] space-y-4 overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-slate-50 p-4"
-                >
-                  {bugAssigneesLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                      <LoaderCircle
-                        size={16}
-                        className="animate-spin text-blue-600"
-                      />
-                      Loading project members...
-                    </div>
-                  ) : bugFormError ? (
-                    <div>
-                      <p role="alert" className="text-sm text-red-700">
-                        {bugFormError}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleOpenCreateBug}
-                        className="mt-2 text-sm font-semibold text-blue-700 hover:text-blue-800"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <label className="block">
-                        <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                          Title
-                        </span>
-                        <input
-                          required
-                          maxLength={200}
-                          value={bugForm.title}
-                          onChange={(event) =>
-                            setBugForm((current) => ({
-                              ...current,
-                              title: event.target.value,
-                            }))
-                          }
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                          Description
-                        </span>
-                        <textarea
-                          required
-                          rows={2}
-                          value={bugForm.description}
-                          onChange={(event) =>
-                            setBugForm((current) => ({
-                              ...current,
-                              description: event.target.value,
-                            }))
-                          }
-                          className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                          Steps to reproduce
-                        </span>
-                        <textarea
-                          required
-                          rows={2}
-                          value={bugForm.stepsToReproduce}
-                          onChange={(event) =>
-                            setBugForm((current) => ({
-                              ...current,
-                              stepsToReproduce: event.target.value,
-                            }))
-                          }
-                          className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                        />
-                      </label>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {[
-                          ["expectedResult", "Expected result"],
-                          ["actualResult", "Actual result"],
-                        ].map(([field, label]) => (
-                          <label key={field} className="block">
-                            <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                              {label}
-                            </span>
-                            <textarea
-                              required
-                              rows={2}
-                              value={bugForm[field]}
-                              onChange={(event) =>
-                                setBugForm((current) => ({
-                                  ...current,
-                                  [field]: event.target.value,
-                                }))
-                              }
-                              className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                            />
-                          </label>
-                        ))}
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="block">
-                          <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                            Assignee
-                          </span>
-                          <select
-                            required
-                            value={bugForm.assignee}
-                            onChange={(event) =>
-                              setBugForm((current) => ({
-                                ...current,
-                                assignee: event.target.value,
-                              }))
-                            }
-                            disabled={bugAssignees.length === 0}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                          >
-                            {bugAssignees.length === 0 && (
-                              <option value="">No project members</option>
-                            )}
-                            {bugAssignees.map((assignee) => (
-                              <option key={assignee} value={assignee}>
-                                {assignee}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        {[
-                          ["status", "Status", bugStatuses],
-                          ["priority", "Priority", bugPriorities],
-                          ["severity", "Severity", bugPriorities],
-                        ].map(([field, label, options]) => (
-                          <label key={field} className="block">
-                            <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                              {label}
-                            </span>
-                            <select
-                              value={bugForm[field]}
-                              onChange={(event) =>
-                                setBugForm((current) => ({
-                                  ...current,
-                                  [field]: event.target.value,
-                                }))
-                              }
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                            >
-                              {options.map((option) => (
-                                <option key={option} value={option}>
-                                  {option.replaceAll("_", " ")}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        ))}
-                      </div>
-                      {bugAssignees.length === 0 && (
-                        <p className="text-sm text-amber-800">
-                          Add a project member before creating a bug.
-                        </p>
-                      )}
-                      {bugSubmitError && (
-                        <p role="alert" className="text-sm text-red-700">
-                          {bugSubmitError}
-                        </p>
-                      )}
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setCreatingBug(false)}
-                          disabled={savingBug}
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={savingBug || bugAssignees.length === 0}
-                          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {savingBug && (
-                            <LoaderCircle
-                              size={15}
-                              className="animate-spin"
-                            />
-                          )}
-                          Create Bug
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </form>
+                <CreateManualBugForm
+                  projectId={projectId}
+                  testTicketId={
+                    ticket?.ticketId ??
+                    ticket?._id ??
+                    ticket?.id ??
+                    ticket?.key ??
+                    ticketKey
+                  }
+                  onCancel={() => setCreatingBug(false)}
+                  onCreated={() => {
+                    setCreatingBug(false);
+                    onBugCreated?.();
+                  }}
+                />
               )}
 
               {selectedBugKey ? (
-                <section className="min-h-0 flex-1 overflow-y-auto p-1">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <h4 className="text-base font-bold text-slate-900">
-                      Bug details
-                    </h4>
-                    <button
-                      type="button"
-                      onClick={handleCloseBugDetails}
-                      className="text-sm font-semibold text-blue-700 hover:text-blue-800"
-                    >
-                      Back to bug tickets
-                    </button>
-                  </div>
-                  {bugDetailsLoading && (
-                    <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-slate-500">
-                      <LoaderCircle
-                        size={18}
-                        className="animate-spin text-blue-600"
-                      />
-                      Loading bug details...
-                    </div>
-                  )}
-                  {bugDetailsError && (
-                    <div className="space-y-2">
-                      <p role="alert" className="text-sm text-red-700">
-                        {bugDetailsError}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setBugDetailsRefresh((current) => current + 1)
-                        }
-                        className="text-sm font-semibold text-blue-700 hover:text-blue-800"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  )}
-                  {!bugDetailsLoading && !bugDetailsError && bugDetails && (
-                    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-semibold text-rose-700">
-                            {bugDetails.key}
-                          </p>
-                          <h5 className="mt-2 break-words text-lg font-bold text-slate-900">
-                            {bugDetails.title}
-                          </h5>
-                        </div>
-                        <span className="rounded bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">
-                          {bugDetails.priority}
-                        </span>
-                      </div>
-
-                      <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                        {bugDetails.description || "No description provided."}
-                      </p>
-
-                      <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
-                        {[
-                          ["Steps to reproduce", bugDetails.stepsToReproduce],
-                          ["Expected result", bugDetails.expectedResult],
-                          ["Actual result", bugDetails.actualResult],
-                          ["Status", bugDetails.status?.replaceAll("_", " ")],
-                          ["Severity", bugDetails.severity],
-                          ["Revision", bugDetails.currentRevision],
-                          ["Project", bugDetails.projectName],
-                          ["Feature", bugDetails.featureName],
-                        ].map(([label, value]) => (
-                          <div key={label}>
-                            <dt className="text-xs font-medium text-slate-500">
-                              {label}
-                            </dt>
-                            <dd className="mt-1 whitespace-pre-wrap break-words font-semibold text-slate-800">
-                              {value ?? "—"}
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </article>
-                  )}
-                </section>
+                <BugTicketDetailsPanel
+                  bugKey={selectedBugKey}
+                  onBack={onCloseBugDetails}
+                />
               ) : (
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                 {relatedTickets.map((relatedTicket) =>

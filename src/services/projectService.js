@@ -1,6 +1,8 @@
 
 import api from "../lib/axios";
 
+const projectMentionsRequests = new Map();
+
 export const createOrganizationProject = async (organizationId, project) => {
   const response = await api.post(
     `/organization/${organizationId}/create-project`,
@@ -112,19 +114,43 @@ export const createProjectFeature = async (projectId, feature) => {
   return response.data;
 };
 
-export const getProjectMentions = async (projectId) => {
-  const response = await api.get(`/mention/${projectId}`);
-  const requiredMentions = response.data?.requiredMentions;
+export const getProjectMentions = (projectId) => {
+  const requestKey = String(projectId);
+  const existingRequest = projectMentionsRequests.get(requestKey);
+  if (existingRequest) return existingRequest;
 
-  if (
-    !requiredMentions ||
-    typeof requiredMentions !== "object" ||
-    Array.isArray(requiredMentions)
-  ) {
-    throw new Error("Unexpected response while loading comment mentions.");
-  }
+  const request = api
+    .get(`/mention/${projectId}`)
+    .then((response) => {
+      const requiredMentions = response.data?.requiredMentions;
 
-  return requiredMentions;
+      if (
+        !requiredMentions ||
+        typeof requiredMentions !== "object" ||
+        Array.isArray(requiredMentions)
+      ) {
+        throw new Error("Unexpected response while loading comment mentions.");
+      }
+
+      return requiredMentions;
+    });
+
+  const trackedRequest = request.then(
+    (mentions) => {
+      if (projectMentionsRequests.get(requestKey) === trackedRequest) {
+        projectMentionsRequests.delete(requestKey);
+      }
+      return mentions;
+    },
+    (error) => {
+      if (projectMentionsRequests.get(requestKey) === trackedRequest) {
+        projectMentionsRequests.delete(requestKey);
+      }
+      throw error;
+    }
+  );
+  projectMentionsRequests.set(requestKey, trackedRequest);
+  return trackedRequest;
 };
 
 export const addTicketComment = async (ticketId, ticketType, delta) => {

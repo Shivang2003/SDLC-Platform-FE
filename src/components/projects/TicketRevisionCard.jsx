@@ -1,4 +1,16 @@
+const formatChangeValue = (value) => {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+};
+
 export default function TicketRevisionCard({ revision }) {
+  const changes = revision.changes ?? {};
+  const changedFields =
+    Array.isArray(revision.changedFields) && revision.changedFields.length > 0
+      ? revision.changedFields
+      : Object.keys(changes);
+
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -19,20 +31,42 @@ export default function TicketRevisionCard({ revision }) {
         {revision.description || "No description provided."}
       </p>
 
-      {Array.isArray(revision.changedFields) &&
-        revision.changedFields.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-semibold text-slate-900">
-              Changed fields:
-            </span>
-            {revision.changedFields.map((field) => (
+      {changedFields.length > 0 && (
+        <div className="mt-3 space-y-2 text-xs">
+          <span className="block font-semibold text-slate-900">
+            Changed fields:
+          </span>
+          {changedFields.map((field) => {
+            const change = changes[field];
+            const oldValue = formatChangeValue(change?.oldValue);
+            const newValue = formatChangeValue(change?.newValue);
+            const hasValues =
+              change &&
+              typeof change === "object" &&
+              ("oldValue" in change || "newValue" in change);
+            const label = hasValues
+              ? `${field}: ${oldValue} → ${newValue}`
+              : field;
+
+            return (
               <span
                 key={field}
-                className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 font-semibold text-red-700"
+                title={label}
+                className="flex w-fit max-w-full items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-red-700"
               >
-                {field}
+                {hasValues ? (
+                  <>
+                    <span className="shrink-0 font-bold">{field}:</span>
+                    <span className="max-w-xs truncate">
+                      {oldValue} → {newValue}
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-bold">{field}</span>
+                )}
               </span>
-            ))}
+            );
+          })}
           </div>
         )}
 

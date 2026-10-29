@@ -29,17 +29,14 @@ import {
   editDevTicket,
   editTestTicket,
   getDevTicketDetails,
-  getFeatureDevTickets,
   getFeatureDevTicketOptions,
-  getFeatureTestTickets,
   getProjectFeatures,
   getProjectMembers,
   getDevTicketRevisions,
   getTestTicketRevisions,
   getTestTicketDetails,
-  updateDevTicketStatus,
-  updateTestTicketStatus,
 } from "../services/projectService";
+import useFeatureTicketBoard from "../hooks/useFeatureTicketBoard";
 
 export default function ProjectFeaturesPage() {
   const { organizationId, projectId, featureId } = useParams();
@@ -72,18 +69,15 @@ export default function ProjectFeaturesPage() {
   const [availableUsersError, setAvailableUsersError] = useState("");
   const [addingProjectMember, setAddingProjectMember] = useState(false);
   const [addProjectMemberError, setAddProjectMemberError] = useState("");
-  const [ticketStatuses, setTicketStatuses] = useState([]);
-  const [devTickets, setDevTickets] = useState([]);
   const [ticketView, setTicketView] = useState("development");
-  const [ticketsLoading, setTicketsLoading] = useState(false);
-  const [ticketsError, setTicketsError] = useState("");
-  const [ticketActionError, setTicketActionError] = useState("");
-  const [pendingTicketKeys, setPendingTicketKeys] = useState(() => new Set());
-  const [dragOverStatus, setDragOverStatus] = useState("");
   const [ticketDetails, setTicketDetails] = useState(null);
+  const [ticketDetailsForKey, setTicketDetailsForKey] = useState("");
   const [ticketDetailsLoading, setTicketDetailsLoading] = useState(false);
   const [ticketDetailsError, setTicketDetailsError] = useState("");
   const [ticketDetailsRefresh, setTicketDetailsRefresh] = useState(0);
+  const ticketDetailsRequestKey = `${selectedTicketType}:${selectedTicketKey}`;
+  const currentTicketDetails =
+    ticketDetailsForKey === ticketDetailsRequestKey ? ticketDetails : null;
   const [ticketRevisions, setTicketRevisions] = useState([]);
   const [ticketRevisionsLoading, setTicketRevisionsLoading] = useState(false);
   const [ticketRevisionsError, setTicketRevisionsError] = useState("");
@@ -104,6 +98,23 @@ export default function ProjectFeaturesPage() {
   const [devTicketOptionsError, setDevTicketOptionsError] = useState("");
   const [creatingTestTicket, setCreatingTestTicket] = useState(false);
   const [createTestTicketError, setCreateTestTicketError] = useState("");
+  const {
+    ticketStatuses,
+    tickets: devTickets,
+    ticketsLoading,
+    ticketsError,
+    ticketActionError,
+    pendingTicketKeys,
+    dragOverStatus,
+    handleTicketDrop,
+    handleStatusDragOver,
+    handleStatusDragLeave,
+  } = useFeatureTicketBoard(
+    projectId,
+    selectedFeatureId,
+    ticketView,
+    ticketRefresh
+  );
 
   useEffect(() => {
     let active = true;
@@ -112,15 +123,9 @@ export default function ProjectFeaturesPage() {
       setFeaturesLoading(true);
       setFeaturesError("");
       setFeatures([]);
-      setTicketStatuses([]);
-      setDevTickets([]);
       setTicketView("development");
-      setTicketsLoading(false);
-      setTicketsError("");
-      setTicketActionError("");
-      setPendingTicketKeys(new Set());
-      setDragOverStatus("");
       setTicketDetails(null);
+      setTicketDetailsForKey("");
       setTicketDetailsLoading(false);
       setTicketDetailsError("");
       setTicketDetailsRefresh(0);
@@ -261,14 +266,18 @@ export default function ProjectFeaturesPage() {
     async function loadTicketDetails() {
       setTicketDetailsLoading(true);
       setTicketDetailsError("");
-      setTicketDetails(null);
 
       try {
         const details =
           selectedTicketType === "test"
             ? await getTestTicketDetails(selectedTicketKey)
             : await getDevTicketDetails(selectedTicketKey);
-        if (active) setTicketDetails(details);
+        if (active) {
+          setTicketDetails(details);
+          setTicketDetailsForKey(
+            `${selectedTicketType}:${selectedTicketKey}`
+          );
+        }
       } catch (error) {
         if (active) {
           setTicketDetailsError(
@@ -288,50 +297,6 @@ export default function ProjectFeaturesPage() {
       active = false;
     };
   }, [selectedTicketKey, selectedTicketType, ticketDetailsRefresh]);
-
-  useEffect(() => {
-    if (!selectedFeatureId) return undefined;
-
-    let active = true;
-
-    async function loadTickets() {
-      setTicketsLoading(true);
-      setTicketsError("");
-      setTicketStatuses([]);
-      setDevTickets([]);
-      setTicketActionError("");
-      setPendingTicketKeys(new Set());
-      setDragOverStatus("");
-
-      try {
-        const ticketBoard =
-          ticketView === "test"
-            ? await getFeatureTestTickets(projectId, selectedFeatureId)
-            : await getFeatureDevTickets(projectId, selectedFeatureId);
-
-        if (!active) return;
-
-        setTicketStatuses(ticketBoard.statuses ?? ticketBoard.status);
-        setDevTickets(ticketBoard.tickets ?? ticketBoard.devTickets);
-      } catch (error) {
-        if (active) {
-          setTicketsError(
-            error.response?.data?.message ||
-              error.message ||
-              "Unable to load this feature's tickets."
-          );
-        }
-      } finally {
-        if (active) setTicketsLoading(false);
-      }
-    }
-
-    loadTickets();
-
-    return () => {
-      active = false;
-    };
-  }, [projectId, selectedFeatureId, ticketView, ticketRefresh]);
 
   const selectedFeature = features.find(
     (feature) => feature.featureId === selectedFeatureId
@@ -353,6 +318,7 @@ export default function ProjectFeaturesPage() {
       return next;
     });
     setTicketDetails(null);
+    setTicketDetailsForKey("");
     setTicketDetailsError("");
     setTicketRevisions([]);
     setTicketRevisionsError("");
@@ -367,6 +333,8 @@ export default function ProjectFeaturesPage() {
       next.delete("bug");
       return next;
     });
+    setTicketDetails(null);
+    setTicketDetailsForKey("");
     setTicketEditError("");
     setTicketRevisions([]);
     setTicketRevisionsError("");
@@ -460,9 +428,12 @@ export default function ProjectFeaturesPage() {
           testTicketStatuses: ticket.testTicketStatuses,
         });
       }
-      setTicketRefresh((current) => current + 1);
+      setTicketDetailsLoading(true);
+      setTicketDetailsError("");
       setTicketDetailsRefresh((current) => current + 1);
-      await handleLoadTicketRevisions(true);
+      setTicketRevisions([]);
+      setTicketRevisionsError("");
+      setRevisionsLoadedForKey("");
       return true;
     } catch (error) {
       setTicketEditError(
@@ -473,50 +444,6 @@ export default function ProjectFeaturesPage() {
       return false;
     } finally {
       setSavingTicketEdit(false);
-    }
-  };
-
-  const handleTicketDrop = async (event, status) => {
-    event.preventDefault();
-    setDragOverStatus("");
-
-    const ticketKey = event.dataTransfer.getData("text/plain");
-    const ticket = devTickets.find((item) => item.key === ticketKey);
-
-    if (
-      !ticket ||
-      ticket.status === status ||
-      pendingTicketKeys.has(ticketKey)
-    ) {
-      return;
-    }
-
-    setPendingTicketKeys((current) => new Set(current).add(ticketKey));
-    setTicketActionError("");
-
-    try {
-      if (ticketView === "test") {
-        await updateTestTicketStatus(ticketKey, status);
-      } else {
-        await updateDevTicketStatus(ticketKey, status);
-      }
-      setDevTickets((current) =>
-        current.map((item) =>
-          item.key === ticketKey ? { ...item, status } : item
-        )
-      );
-    } catch (error) {
-      setTicketActionError(
-        error.response?.data?.message ||
-          error.message ||
-          `Unable to move ${ticketKey} to ${status.replaceAll("_", " ")}.`
-      );
-    } finally {
-      setPendingTicketKeys((current) => {
-        const next = new Set(current);
-        next.delete(ticketKey);
-        return next;
-      });
     }
   };
 
@@ -611,15 +538,6 @@ export default function ProjectFeaturesPage() {
     } finally {
       setCreatingTestTicket(false);
     }
-  };
-
-  const handleStatusDragOver = (event, status) => {
-    event.preventDefault();
-    setDragOverStatus(status);
-  };
-
-  const handleStatusDragLeave = (status) => {
-    setDragOverStatus((current) => (current === status ? "" : current));
   };
 
   return (
@@ -833,7 +751,7 @@ export default function ProjectFeaturesPage() {
           projectId={projectId}
           loading={ticketDetailsLoading}
           error={ticketDetailsError}
-          details={ticketDetails}
+          details={currentTicketDetails}
           onClose={handleCloseTicketDetails}
           assignees={projectMembers}
           loadingAssignees={loadingEditAssignees}
