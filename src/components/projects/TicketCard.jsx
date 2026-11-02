@@ -3,6 +3,7 @@ import { LoaderCircle } from "lucide-react";
 export default function TicketCard({
   ticket,
   isUpdating,
+  draggable = true,
   onClick,
   ticketType,
 }) {
@@ -10,15 +11,21 @@ export default function TicketCard({
 
   return (
     <article
-      draggable={!isUpdating}
-      onDragStart={(event) => {
-        event.dataTransfer.setData("text/plain", ticket.key);
-        event.dataTransfer.effectAllowed = "move";
-      }}
+      draggable={draggable && !isUpdating}
+      onDragStart={
+        draggable
+          ? (event) => {
+              event.dataTransfer.setData("text/plain", ticket.key);
+              event.dataTransfer.effectAllowed = "move";
+            }
+          : undefined
+      }
       className={`rounded-lg border border-slate-200 bg-white shadow-sm ${
         isUpdating
           ? "cursor-wait opacity-60"
-          : "cursor-grab active:cursor-grabbing"
+          : draggable
+            ? "cursor-grab active:cursor-grabbing"
+            : ""
       }`}
     >
       <button

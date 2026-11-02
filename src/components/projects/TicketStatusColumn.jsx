@@ -10,15 +10,16 @@ export default function TicketStatusColumn({
   onDrop,
   onTicketClick,
   ticketType,
+  canMoveTickets,
 }) {
   const displayStatus = status.replaceAll("_", " ");
 
   return (
     <section
       aria-label={`${displayStatus} tickets`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      onDragOver={canMoveTickets ? onDragOver : undefined}
+      onDragLeave={canMoveTickets ? onDragLeave : undefined}
+      onDrop={canMoveTickets ? onDrop : undefined}
       className={`w-72 shrink-0 rounded-xl p-3 transition-colors ${
         dragOver ? "bg-blue-100 ring-2 ring-blue-300" : "bg-slate-100"
       }`}
@@ -37,6 +38,7 @@ export default function TicketStatusColumn({
             key={ticket.key}
             ticket={ticket}
             isUpdating={pendingTicketKeys.has(ticket.key)}
+            draggable={canMoveTickets}
             onClick={
               onTicketClick
                 ? () => onTicketClick(ticket.key, ticketType)

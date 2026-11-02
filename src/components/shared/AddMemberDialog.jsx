@@ -11,6 +11,8 @@ export default function AddMemberDialog({
   submitError,
   onClose,
   onSubmit,
+  entityLabel = "Organization",
+  roles = organizationRoles,
 }) {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [userListOpen, setUserListOpen] = useState(false);
@@ -45,16 +47,16 @@ export default function AddMemberDialog({
       <section
         role="dialog"
         aria-modal="true"
-        aria-labelledby="add-organization-member-heading"
+        aria-labelledby="add-member-heading"
         className="w-full max-w-lg overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl"
       >
         <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-7">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">
-              Organization members
+              {entityLabel} members
             </p>
             <h2
-              id="add-organization-member-heading"
+              id="add-member-heading"
               className="mt-1 text-lg font-bold"
             >
               Add member
@@ -165,7 +167,7 @@ export default function AddMemberDialog({
               disabled={submitting}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
             >
-              {organizationRoles.map((option) => (
+              {roles.map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
