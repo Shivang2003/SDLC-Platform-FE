@@ -18,6 +18,8 @@ export default function TicketBoard({
   creatingTicket,
   onDragOverStatus,
   onDragLeaveStatus,
+  canCreateTicket,
+  canMoveTickets,
 }) {
   return (
     <section aria-labelledby="ticket-board-heading">
@@ -39,7 +41,7 @@ export default function TicketBoard({
           </span>
         )}
       </div>
-      {ticketType !== "test" ? (
+      {canCreateTicket && ticketType !== "test" ? (
         <div className="mb-4 flex justify-end">
           <button
             type="button"
@@ -53,7 +55,7 @@ export default function TicketBoard({
             Create dev ticket
           </button>
         </div>
-      ) : (
+      ) : canCreateTicket ? (
         <div className="mb-4 flex justify-end">
           <button
             type="button"
@@ -67,7 +69,7 @@ export default function TicketBoard({
             Create test ticket
           </button>
         </div>
-      )}
+      ) : null}
 
       {loading && (
         <div className="flex min-h-48 items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-500">
@@ -111,6 +113,7 @@ export default function TicketBoard({
               onDrop={(event) => onTicketDrop(event, status)}
               onTicketClick={onTicketClick}
               ticketType={ticketType}
+              canMoveTickets={canMoveTickets}
             />
           ))}
         </div>

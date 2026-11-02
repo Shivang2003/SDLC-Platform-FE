@@ -19,6 +19,32 @@ export const addProjectMember = async (projectId, member) => {
   return response.data;
 };
 
+export const changeProjectMemberRole = async (projectId, memberRole) => {
+  const response = await api.post(
+    `/project/${projectId}/change-roles`,
+    memberRole
+  );
+  return response.data;
+};
+
+export const getProjectMemberDetails = async (projectId) => {
+  const response = await api.get(
+    `/project/${projectId}/project-member-details`
+  );
+  const memberDetails = response.data;
+  const validRoles = ["VIEWER", "DEV", "TESTER", "ADMIN", "OWNER", "WORKER"];
+
+  if (
+    !memberDetails ||
+    typeof memberDetails.userId !== "string" ||
+    !validRoles.includes(memberDetails.role)
+  ) {
+    throw new Error("Unexpected response while loading project member details.");
+  }
+
+  return memberDetails;
+};
+
 export const getOrganizationProjects = async (organizationId) => {
   const response = await api.get(
     `/organization/${organizationId}/projects`

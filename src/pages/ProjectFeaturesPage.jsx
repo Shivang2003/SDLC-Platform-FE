@@ -4,6 +4,7 @@ import {
   Layers3,
   LoaderCircle,
   Plus,
+  UserCog,
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,9 +21,11 @@ import TicketBoard from "../components/projects/TicketBoard";
 import ProjectFeaturePanel from "../components/projects/ProjectFeaturePanel";
 import CreateFeatureDialog from "../components/projects/CreateFeatureDialog";
 import AddMemberDialog from "../components/shared/AddMemberDialog";
+import ChangeProjectMemberRoleDialog from "../components/projects/ChangeProjectMemberRoleDialog";
 import { getAllUsers } from "../services/organizationService";
 import {
   addProjectMember,
+  changeProjectMemberRole,
   createProjectFeature,
   createDevTicket,
   createTestTicket,
@@ -31,6 +34,7 @@ import {
   getDevTicketDetails,
   getFeatureDevTicketOptions,
   getProjectFeatures,
+  getProjectMemberDetails,
   getProjectMembers,
   getDevTicketRevisions,
   getTestTicketRevisions,
@@ -63,7 +67,16 @@ export default function ProjectFeaturesPage() {
   const [createFeatureDialogOpen, setCreateFeatureDialogOpen] = useState(false);
   const [creatingFeature, setCreatingFeature] = useState(false);
   const [createFeatureError, setCreateFeatureError] = useState("");
+  const [projectMemberDetailsResult, setProjectMemberDetailsResult] =
+    useState(null);
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
+  const [changeRoleDialogOpen, setChangeRoleDialogOpen] = useState(false);
+  const [changeRoleMembers, setChangeRoleMembers] = useState([]);
+  const [changeRoleMembersLoading, setChangeRoleMembersLoading] =
+    useState(false);
+  const [changeRoleMembersError, setChangeRoleMembersError] = useState("");
+  const [changingMemberRole, setChangingMemberRole] = useState(false);
+  const [changeMemberRoleError, setChangeMemberRoleError] = useState("");
   const [availableUsers, setAvailableUsers] = useState([]);
   const [availableUsersLoading, setAvailableUsersLoading] = useState(false);
   const [availableUsersError, setAvailableUsersError] = useState("");
@@ -98,6 +111,23 @@ export default function ProjectFeaturesPage() {
   const [devTicketOptionsError, setDevTicketOptionsError] = useState("");
   const [creatingTestTicket, setCreatingTestTicket] = useState(false);
   const [createTestTicketError, setCreateTestTicketError] = useState("");
+  const currentProjectMemberDetails =
+    projectMemberDetailsResult?.projectId === projectId
+      ? projectMemberDetailsResult
+      : null;
+  const canManageProjectMembers = ["OWNER", "ADMIN"].includes(
+    currentProjectMemberDetails?.role
+  );
+  const canManageDevelopmentTickets = [
+    "DEV",
+    "ADMIN",
+    "OWNER",
+  ].includes(currentProjectMemberDetails?.role);
+  const canManageTestTickets = [
+    "TESTER",
+    "ADMIN",
+    "OWNER",
+  ].includes(currentProjectMemberDetails?.role);
   const {
     ticketStatuses,
     tickets: devTickets,
@@ -115,6 +145,38 @@ export default function ProjectFeaturesPage() {
     ticketView,
     ticketRefresh
   );
+
+  useEffect(() => {
+    if (!projectId) return undefined;
+
+    let active = true;
+
+    getProjectMemberDetails(projectId)
+      .then((memberDetails) => {
+        if (active) {
+          setProjectMemberDetailsResult({
+            projectId,
+            role: memberDetails.role,
+          });
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setProjectMemberDetailsResult({
+            projectId,
+            error:
+              error.response?.data?.error ||
+              error.response?.data?.message ||
+              error.message ||
+              "Unable to load your project role.",
+          });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
 
   useEffect(() => {
     let active = true;
@@ -154,11 +216,18 @@ export default function ProjectFeaturesPage() {
         setFeatures(featureList);
       } catch (error) {
         if (active) {
-          setFeaturesError(
-            error.response?.data?.message ||
-              error.message ||
-              "Unable to load this project's features."
-          );
+          const apiError = error.response?.data?.error;
+          if (apiError?.trim().toLowerCase() === "no features available") {
+            setFeatures([]);
+            setFeaturesError("");
+          } else {
+            setFeaturesError(
+              apiError ||
+                error.response?.data?.message ||
+                error.message ||
+                "Unable to load this project's features."
+            );
+          }
         }
       } finally {
         if (active) setFeaturesLoading(false);
@@ -228,6 +297,48 @@ export default function ProjectFeaturesPage() {
       );
     } finally {
       setAddingProjectMember(false);
+    }
+  };
+
+  const handleOpenChangeRole = async () => {
+    setChangeRoleDialogOpen(true);
+    setChangeRoleMembersLoading(true);
+    setChangeRoleMembersError("");
+    setChangeMemberRoleError("");
+
+    try {
+      const members = await getProjectMembers(projectId);
+      setChangeRoleMembers(members);
+      setProjectMembers(members);
+    } catch (error) {
+      setChangeRoleMembersError(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          error.message ||
+          "Unable to load project members."
+      );
+    } finally {
+      setChangeRoleMembersLoading(false);
+    }
+  };
+
+  const handleChangeProjectMemberRole = async (memberRole) => {
+    setChangingMemberRole(true);
+    setChangeMemberRoleError("");
+
+    try {
+      await changeProjectMemberRole(projectId, memberRole);
+      setChangeRoleDialogOpen(false);
+      toast.success(`${memberRole.userName}'s project role was updated.`);
+    } catch (error) {
+      setChangeMemberRoleError(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          error.message ||
+          "Unable to change this project member's role."
+      );
+    } finally {
+      setChangingMemberRole(false);
     }
   };
 
@@ -572,14 +683,26 @@ export default function ProjectFeaturesPage() {
               {features.length} {features.length === 1 ? "feature" : "features"}
             </span>
           )}
-          <button
-            type="button"
-            onClick={handleOpenAddProjectMember}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-          >
-            <UserPlus size={17} />
-            Add member
-          </button>
+          {canManageProjectMembers && (
+            <>
+              <button
+                type="button"
+                onClick={handleOpenAddProjectMember}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                <UserPlus size={17} />
+                Add member
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenChangeRole}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                <UserCog size={17} />
+                Change member roles
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -592,6 +715,14 @@ export default function ProjectFeaturesPage() {
             Create feature
           </button>
         </div>
+        {currentProjectMemberDetails?.error && (
+          <p
+            role="alert"
+            className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          >
+            {currentProjectMemberDetails.error}
+          </p>
+        )}
       </div>
 
       {featuresLoading && (
@@ -613,7 +744,7 @@ export default function ProjectFeaturesPage() {
             <Layers3 size={28} />
           </div>
           <h3 className="text-base font-semibold text-slate-800">
-            No features yet
+            No features available
           </h3>
           <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
             This project doesn&apos;t have any features.
@@ -679,6 +810,16 @@ export default function ProjectFeaturesPage() {
             }
             onDragOverStatus={handleStatusDragOver}
             onDragLeaveStatus={handleStatusDragLeave}
+            canCreateTicket={
+              ticketView === "test"
+                ? canManageTestTickets
+                : canManageDevelopmentTickets
+            }
+            canMoveTickets={
+              ticketView === "test"
+                ? canManageTestTickets
+                : canManageDevelopmentTickets
+            }
           />
           {membersError && ticketView === "development" && (
             <div
@@ -717,8 +858,21 @@ export default function ProjectFeaturesPage() {
           usersError={availableUsersError}
           submitting={addingProjectMember}
           submitError={addProjectMemberError}
+          entityLabel="Project"
+          roles={["VIEWER", "DEV", "TESTER", "ADMIN", "OWNER", "WORKER"]}
           onClose={() => setAddMemberDialogOpen(false)}
           onSubmit={handleAddProjectMember}
+        />
+      )}
+      {changeRoleDialogOpen && (
+        <ChangeProjectMemberRoleDialog
+          members={changeRoleMembers}
+          membersLoading={changeRoleMembersLoading}
+          membersError={changeRoleMembersError}
+          submitting={changingMemberRole}
+          submitError={changeMemberRoleError}
+          onClose={() => setChangeRoleDialogOpen(false)}
+          onSubmit={handleChangeProjectMemberRole}
         />
       )}
 
@@ -768,6 +922,13 @@ export default function ProjectFeaturesPage() {
           }
           onBugClick={handleBugClick}
           onCloseBugDetails={handleCloseBugDetails}
+          canEditTicket={
+            selectedTicketType === "test"
+              ? canManageTestTickets
+              : canManageDevelopmentTickets
+          }
+          canEditRelatedTestTickets={canManageTestTickets}
+          canCreateManualBug={canManageTestTickets}
         />
       )}
     </section>

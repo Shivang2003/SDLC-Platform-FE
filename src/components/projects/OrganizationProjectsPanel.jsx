@@ -1,11 +1,11 @@
 import { LoaderCircle, Plus } from "lucide-react";
 import ProjectGrid from "./ProjectGrid";
-import ProjectsEmptyState from "./ProjectsEmptyState";
 
 export default function OrganizationProjectsPanel({
   projects,
   loading,
   error,
+  canCreateProject,
   onCreateProject,
 }) {
   return (
@@ -23,14 +23,16 @@ export default function OrganizationProjectsPanel({
               {projects.length} {projects.length === 1 ? "project" : "projects"}
             </span>
           )}
-          <button
-            type="button"
-            onClick={onCreateProject}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-          >
-            <Plus size={17} />
-            Create project
-          </button>
+          {canCreateProject && (
+            <button
+              type="button"
+              onClick={onCreateProject}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              <Plus size={17} />
+              Create project
+            </button>
+          )}
         </div>
       </div>
 
@@ -46,10 +48,9 @@ export default function OrganizationProjectsPanel({
         </div>
       )}
       {!loading && !error && projects.length === 0 && (
-        <ProjectsEmptyState
-          title="No projects yet"
-          description="This organization doesn't have any projects. Projects will appear here when they are created."
-        />
+        <p className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+          No projects found.
+        </p>
       )}
       {!loading && !error && projects.length > 0 && (
         <ProjectGrid projects={projects} />

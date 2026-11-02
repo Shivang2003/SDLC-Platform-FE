@@ -59,6 +59,9 @@ export default function TicketDetailsDialog({
   selectedBugKey = "",
   onBugClick,
   onCloseBugDetails,
+  canEditTicket = true,
+  canEditRelatedTestTickets = true,
+  canCreateManualBug = true,
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState(null);
@@ -130,6 +133,7 @@ export default function TicketDetailsDialog({
   };
 
   const handleStartEdit = async () => {
+    if (!canEditTicket) return;
     const availableAssignees = await onEdit();
     if (!availableAssignees) return;
 
@@ -500,24 +504,26 @@ export default function TicketDetailsDialog({
                     <h3 className="text-xl font-bold text-slate-900">
                       {ticket.title}
                     </h3>
-                    <button
-                      type="button"
-                      onClick={handleStartEdit}
-                      disabled={loadingAssignees}
-                      aria-label={`Edit ${ticket.title}`}
-                      title="Edit ticket"
-                      className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-blue-700 disabled:opacity-50"
-                    >
-                      {loadingAssignees ? (
-                        <LoaderCircle
-                          size={16}
-                          className="animate-spin"
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <Pencil size={16} aria-hidden="true" />
-                      )}
-                    </button>
+                    {canEditTicket && (
+                      <button
+                       type="button"
+                       onClick={handleStartEdit}
+                       disabled={loadingAssignees}
+                       aria-label={`Edit ${ticket.title}`}
+                       title="Edit ticket"
+                       className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-blue-700 disabled:opacity-50"
+                     >
+                       {loadingAssignees ? (
+                         <LoaderCircle
+                           size={16}
+                           className="animate-spin"
+                           aria-hidden="true"
+                         />
+                       ) : (
+                         <Pencil size={16} aria-hidden="true" />
+                       )}
+                     </button>
+                    )}
                   </div>
                 </div>
                 <span className="rounded bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
@@ -686,14 +692,16 @@ export default function TicketDetailsDialog({
                 </div>
                 {isTestTicket && (
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleOpenCreateBug}
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                    >
-                      <Plus size={15} />
-                      Create Bug
-                    </button>
+                    {canCreateManualBug && (
+                      <button
+                       type="button"
+                       onClick={handleOpenCreateBug}
+                       className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                     >
+                       <Plus size={15} />
+                       Create Bug
+                     </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setShowAutomatedBugDocs(true)}
@@ -741,7 +749,7 @@ export default function TicketDetailsDialog({
                     <TestTicketCard
                       key={relatedTicket.key}
                       ticket={relatedTicket}
-                      editing={isEditing}
+                      editing={isEditing && canEditRelatedTestTickets}
                       executionStatus={
                         editValues?.testTicketStatuses.find(
                           (item) => item.testTicketKey === relatedTicket.key
