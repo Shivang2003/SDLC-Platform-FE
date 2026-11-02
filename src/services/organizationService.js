@@ -39,3 +39,23 @@ export const addOrganizationMember = async (organizationId, member) => {
   );
   return response.data;
 };
+
+export const getOrganizationMemberDetails = async (organizationId) => {
+  const response = await api.get(
+    `/organization/${organizationId}/organization-member-details`
+  );
+  const memberDetails = response.data;
+  const validRoles = ["ADMIN", "OWNER", "VIEWER", "WORKER"];
+
+  if (
+    !memberDetails ||
+    typeof memberDetails.userId !== "string" ||
+    !validRoles.includes(memberDetails.role)
+  ) {
+    throw new Error(
+      "Unexpected response while loading organization member details."
+    );
+  }
+
+  return memberDetails;
+};

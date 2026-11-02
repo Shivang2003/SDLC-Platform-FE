@@ -154,11 +154,18 @@ export default function ProjectFeaturesPage() {
         setFeatures(featureList);
       } catch (error) {
         if (active) {
-          setFeaturesError(
-            error.response?.data?.message ||
-              error.message ||
-              "Unable to load this project's features."
-          );
+          const apiError = error.response?.data?.error;
+          if (apiError?.trim().toLowerCase() === "no features available") {
+            setFeatures([]);
+            setFeaturesError("");
+          } else {
+            setFeaturesError(
+              apiError ||
+                error.response?.data?.message ||
+                error.message ||
+                "Unable to load this project's features."
+            );
+          }
         }
       } finally {
         if (active) setFeaturesLoading(false);
@@ -613,7 +620,7 @@ export default function ProjectFeaturesPage() {
             <Layers3 size={28} />
           </div>
           <h3 className="text-base font-semibold text-slate-800">
-            No features yet
+            No features available
           </h3>
           <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
             This project doesn&apos;t have any features.

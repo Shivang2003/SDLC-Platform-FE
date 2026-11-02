@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   addOrganizationMember,
   getAllUsers,
+  getOrganizationMemberDetails,
   getOrganizations,
 } from "../services/organizationService";
 import {
@@ -26,6 +27,7 @@ export default function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [organization, setOrganization] = useState(null);
+  const [memberDetailsResult, setMemberDetailsResult] = useState(null);
   const [projects, setProjects] = useState([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState("");
@@ -50,6 +52,45 @@ export default function ProjectsPage() {
   const [projectRefresh, setProjectRefresh] = useState(0);
   const activeTab =
     searchParams.get("view") === "projects" ? "projects" : "summary";
+  const currentMemberDetails =
+    memberDetailsResult?.organizationId === organizationId
+      ? memberDetailsResult
+      : null;
+  const canAddOrganizationMembers = ["ADMIN", "OWNER"].includes(
+    currentMemberDetails?.role
+  );
+
+  useEffect(() => {
+    if (!organizationId) return undefined;
+
+    let active = true;
+
+    getOrganizationMemberDetails(organizationId)
+      .then((memberDetails) => {
+        if (active) {
+          setMemberDetailsResult({
+            organizationId,
+            role: memberDetails.role,
+          });
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setMemberDetailsResult({
+            organizationId,
+            error:
+              error.response?.data?.error ||
+              error.response?.data?.message ||
+              error.message ||
+              "Unable to load your organization role.",
+          });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [organizationId]);
 
   const handleOpenAddMember = async () => {
     setAddMemberDialogOpen(true);
@@ -137,10 +178,17 @@ export default function ProjectsPage() {
         setProjects(projectList);
       } catch (error) {
         if (active) {
-          setProjectsError(
-            error.response?.data?.message ||
-              "Unable to load this organization's projects."
-          );
+          const apiError = error.response?.data?.error;
+          if (apiError?.trim().toLowerCase() === "no project found") {
+            setProjects([]);
+            setProjectsError("");
+          } else {
+            setProjectsError(
+              apiError ||
+                error.response?.data?.message ||
+                "Unable to load this organization's projects."
+            );
+          }
         }
       } finally {
         if (active) setProjectsLoading(false);
@@ -279,15 +327,25 @@ export default function ProjectsPage() {
             View organization metrics and manage its projects.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleOpenAddMember}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-        >
-          <UserPlus size={17} />
-          Add member
-        </button>
+        {canAddOrganizationMembers && (
+          <button
+            type="button"
+            onClick={handleOpenAddMember}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            <UserPlus size={17} />
+            Add member
+          </button>
+        )}
       </div>
+      {currentMemberDetails?.error && (
+        <p
+          role="alert"
+          className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+        >
+          {currentMemberDetails.error}
+        </p>
+      )}
 
       <div
         className="mt-8 flex gap-6 border-b border-slate-200"
@@ -342,6 +400,7 @@ export default function ProjectsPage() {
           projects={projects}
           loading={projectsLoading}
           error={projectsError}
+          canCreateProject={canAddOrganizationMembers}
           onCreateProject={() => {
             setCreateProjectError("");
             setCreateProjectDialogOpen(true);
