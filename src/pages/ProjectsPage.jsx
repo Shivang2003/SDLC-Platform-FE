@@ -56,6 +56,7 @@ export default function ProjectsPage() {
     memberDetailsResult?.organizationId === organizationId
       ? memberDetailsResult
       : null;
+  const organizationHasNoProjects = currentMemberDetails?.noProjects === true;
   const canAddOrganizationMembers = ["ADMIN", "OWNER"].includes(
     currentMemberDetails?.role
   );
@@ -76,13 +77,22 @@ export default function ProjectsPage() {
       })
       .catch((error) => {
         if (active) {
+          const apiError =
+            error.response?.data?.error ||
+            error.response?.data?.message ||
+            error.message ||
+            "";
+          if (
+            apiError.trim().toLowerCase() ===
+            "you don't have access to any project"
+          ) {
+            setMemberDetailsResult({ organizationId, noProjects: true });
+            return;
+          }
+
           setMemberDetailsResult({
             organizationId,
-            error:
-              error.response?.data?.error ||
-              error.response?.data?.message ||
-              error.message ||
-              "Unable to load your organization role.",
+            error: apiError || "Unable to load your organization role.",
           });
         }
       });
@@ -178,14 +188,24 @@ export default function ProjectsPage() {
         setProjects(projectList);
       } catch (error) {
         if (active) {
-          const apiError = error.response?.data?.error;
-          if (apiError?.trim().toLowerCase() === "no project found") {
+          const responseData = error.response?.data;
+          const apiError =
+            typeof responseData === "string"
+              ? responseData
+              : responseData?.error ||
+                responseData?.message ||
+                error.message ||
+                "";
+          const normalizedError = apiError.trim().toLowerCase();
+          if (
+            normalizedError === "no project found" ||
+            normalizedError === "you don't have access to any project"
+          ) {
             setProjects([]);
             setProjectsError("");
           } else {
             setProjectsError(
               apiError ||
-                error.response?.data?.message ||
                 "Unable to load this organization's projects."
             );
           }
@@ -338,7 +358,7 @@ export default function ProjectsPage() {
           </button>
         )}
       </div>
-      {currentMemberDetails?.error && (
+      {currentMemberDetails?.error && !organizationHasNoProjects && (
         <p
           role="alert"
           className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
@@ -397,9 +417,9 @@ export default function ProjectsPage() {
 
       {activeTab === "projects" && (
         <OrganizationProjectsPanel
-          projects={projects}
-          loading={projectsLoading}
-          error={projectsError}
+          projects={organizationHasNoProjects ? [] : projects}
+          loading={organizationHasNoProjects ? false : projectsLoading}
+          error={organizationHasNoProjects ? "" : projectsError}
           canCreateProject={canAddOrganizationMembers}
           onCreateProject={() => {
             setCreateProjectError("");

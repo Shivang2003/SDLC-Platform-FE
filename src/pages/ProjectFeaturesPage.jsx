@@ -4,6 +4,7 @@ import {
   Layers3,
   LoaderCircle,
   Plus,
+  ClipboardList,
   UserCog,
   UserPlus,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import ProjectFeaturePanel from "../components/projects/ProjectFeaturePanel";
 import CreateFeatureDialog from "../components/projects/CreateFeatureDialog";
 import AddMemberDialog from "../components/shared/AddMemberDialog";
 import ChangeProjectMemberRoleDialog from "../components/projects/ChangeProjectMemberRoleDialog";
+import WorklogsDialog from "../components/projects/WorklogsDialog";
 import { getAllUsers } from "../services/organizationService";
 import {
   addProjectMember,
@@ -41,6 +43,7 @@ import {
   getTestTicketDetails,
 } from "../services/projectService";
 import useFeatureTicketBoard from "../hooks/useFeatureTicketBoard";
+import { getProjectWorklogStatus } from "../services/worklogService";
 
 export default function ProjectFeaturesPage() {
   const { organizationId, projectId, featureId } = useParams();
@@ -69,6 +72,10 @@ export default function ProjectFeaturesPage() {
   const [createFeatureError, setCreateFeatureError] = useState("");
   const [projectMemberDetailsResult, setProjectMemberDetailsResult] =
     useState(null);
+  const [worklogStatusResult, setWorklogStatusResult] = useState(null);
+  const [worklogStatusRefresh, setWorklogStatusRefresh] = useState(0);
+  const [worklogsDialogMode, setWorklogsDialogMode] = useState("");
+  const [submittedWorklogResult, setSubmittedWorklogResult] = useState(null);
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   const [changeRoleDialogOpen, setChangeRoleDialogOpen] = useState(false);
   const [changeRoleMembers, setChangeRoleMembers] = useState([]);
@@ -118,6 +125,13 @@ export default function ProjectFeaturesPage() {
   const canManageProjectMembers = ["OWNER", "ADMIN"].includes(
     currentProjectMemberDetails?.role
   );
+  const currentWorklogStatus =
+    worklogStatusResult?.projectId === projectId &&
+    worklogStatusResult?.refresh === worklogStatusRefresh
+      ? worklogStatusResult
+      : null;
+  const hasSubmittedWorklog =
+    submittedWorklogResult?.projectId === projectId;
   const canManageDevelopmentTickets = [
     "DEV",
     "ADMIN",
@@ -179,6 +193,40 @@ export default function ProjectFeaturesPage() {
   }, [projectId]);
 
   useEffect(() => {
+    if (!projectId) return undefined;
+
+    let active = true;
+
+    getProjectWorklogStatus(projectId)
+      .then((status) => {
+        if (active) {
+          setWorklogStatusResult({
+            projectId,
+            refresh: worklogStatusRefresh,
+            status,
+          });
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setWorklogStatusResult({
+            projectId,
+            refresh: worklogStatusRefresh,
+            error:
+              error.response?.data?.message ||
+              error.response?.data?.error ||
+              error.message ||
+              "Unable to check project worklogs.",
+          });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [projectId, worklogStatusRefresh]);
+
+  useEffect(() => {
     let active = true;
 
     async function loadFeatures() {
@@ -208,6 +256,7 @@ export default function ProjectFeaturesPage() {
       setDevTicketOptionsError("");
       setCreatingTestTicket(false);
       setCreateTestTicketError("");
+      setWorklogsDialogMode("");
 
       try {
         const featureList = await getProjectFeatures(projectId);
@@ -683,6 +732,51 @@ export default function ProjectFeaturesPage() {
               {features.length} {features.length === 1 ? "feature" : "features"}
             </span>
           )}
+          {canManageProjectMembers &&
+            currentWorklogStatus?.status?.exists &&
+            currentWorklogStatus.status.enabled && (
+              <button
+                type="button"
+                onClick={() => setWorklogsDialogMode("recent")}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                <ClipboardList size={17} />
+                Worklogs
+              </button>
+            )}
+          {canManageProjectMembers &&
+            currentWorklogStatus?.status?.exists === false && (
+              <button
+                type="button"
+                onClick={() => setWorklogsDialogMode("initialize")}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                <ClipboardList size={17} />
+                Create Worklog
+              </button>
+            )}
+          {!canManageProjectMembers &&
+            currentProjectMemberDetails?.role &&
+            currentWorklogStatus?.status?.exists &&
+            currentWorklogStatus.status.enabled &&
+            !hasSubmittedWorklog && (
+              <button
+                type="button"
+                onClick={() => setWorklogsDialogMode("submit")}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                <ClipboardList size={17} />
+                Fill worklog
+              </button>
+            )}
+          {!canManageProjectMembers &&
+            hasSubmittedWorklog &&
+            currentWorklogStatus?.status?.exists &&
+            currentWorklogStatus.status.enabled && (
+              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                Worklog submitted
+              </span>
+            )}
           {canManageProjectMembers && (
             <>
               <button
@@ -715,6 +809,14 @@ export default function ProjectFeaturesPage() {
             Create feature
           </button>
         </div>
+        {currentWorklogStatus?.error && (
+          <p
+            role="alert"
+            className="mb-5 w-full rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          >
+            {currentWorklogStatus.error}
+          </p>
+        )}
         {currentProjectMemberDetails?.error && (
           <p
             role="alert"
@@ -873,6 +975,30 @@ export default function ProjectFeaturesPage() {
           submitError={changeMemberRoleError}
           onClose={() => setChangeRoleDialogOpen(false)}
           onSubmit={handleChangeProjectMemberRole}
+        />
+      )}
+      {worklogsDialogMode && (
+        <WorklogsDialog
+          projectId={projectId}
+          mode={worklogsDialogMode}
+          onClose={() => setWorklogsDialogMode("")}
+          onInitialized={() => {
+            setWorklogsDialogMode("");
+            setWorklogStatusRefresh((current) => current + 1);
+            toast.success("Project worklogs created successfully.");
+          }}
+          onSubmitted={(worklog) => {
+            setSubmittedWorklogResult({ projectId, worklog });
+            setWorklogsDialogMode("");
+            toast.success("Worklog submitted successfully.");
+          }}
+          onUpdated={() => {
+            setWorklogsDialogMode("");
+            setWorklogStatusRefresh((current) => current + 1);
+            toast.success("Worklog settings updated successfully.");
+          }}
+          canEditSettings={canManageProjectMembers}
+          onEditSettings={() => setWorklogsDialogMode("update")}
         />
       )}
 
