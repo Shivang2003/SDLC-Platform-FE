@@ -7,6 +7,13 @@ import {
   updateProjectWorklogs,
 } from "../../services/worklogService";
 
+const WORKLOG_TIME_ZONE = "Asia/Calcutta";
+
+const toMinutes = (time) => {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
 function WorklogMember({ member, filled, expanded, onToggle }) {
   return (
     <li className="rounded-xl border border-slate-200 bg-white">
@@ -59,12 +66,13 @@ export default function WorklogsDialog({
   const [expandedWorklogId, setExpandedWorklogId] = useState("");
   const [startTime, setStartTime] = useState("00:00");
   const [endTime, setEndTime] = useState("02:00");
-  const [timeZone, setTimeZone] = useState(
-    Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata"
-  );
   const [worklogText, setWorklogText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const validTimeRange =
+    endTime &&
+    startTime &&
+    toMinutes(endTime) - toMinutes(startTime) >= 60;
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -105,6 +113,14 @@ export default function WorklogsDialog({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (
+      (mode === "initialize" || mode === "update") &&
+      !validTimeRange
+    ) {
+      setSubmitError("End time must be at least one hour after start time.");
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError("");
 
@@ -112,7 +128,7 @@ export default function WorklogsDialog({
       const configuration = {
         startTime,
         endTime,
-        timeZone: timeZone.trim(),
+        timeZone: WORKLOG_TIME_ZONE,
       };
 
       if (mode === "initialize") {
@@ -128,16 +144,28 @@ export default function WorklogsDialog({
         onSubmitted(submittedWorklog);
       }
     } catch (error) {
-      setSubmitError(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          error.message ||
-          (mode === "initialize"
-            ? "Unable to create project worklogs."
-            : mode === "update"
-              ? "Unable to update project worklogs."
-              : "Unable to submit your worklog.")
-      );
+      const responseData = error.response?.data;
+      const responseMessage =
+        typeof responseData === "string"
+          ? responseData
+          : responseData?.message || responseData?.error;
+      const normalizedMessage = responseMessage?.trim().toLowerCase();
+      const fallbackMessage =
+        mode === "initialize"
+          ? "Unable to create project worklogs."
+          : mode === "update"
+            ? "Unable to update project worklogs."
+            : "Unable to submit your worklog.";
+      const message =
+        normalizedMessage === "worklog already submitted for today"
+          ? "Worklog already submitted for today"
+          : responseMessage ||
+            (error.message?.startsWith("Request failed with status code")
+              ? fallbackMessage
+              : error.message) ||
+            fallbackMessage;
+
+      setSubmitError(message);
     } finally {
       setSubmitting(false);
     }
@@ -273,8 +301,8 @@ export default function WorklogsDialog({
               <>
                 <p className="text-sm leading-6 text-slate-600">
                   {mode === "initialize"
-                    ? "Choose the daily reporting window and time zone for this project's worklogs."
-                    : "Update the daily reporting window and time zone for this project's worklogs."}
+                    ? "Choose the daily reporting window for this project's worklogs."
+                    : "Update the daily reporting window for this project's worklogs."}
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
@@ -284,6 +312,7 @@ export default function WorklogsDialog({
                     <input
                       type="time"
                       required
+                      step={60}
                       value={startTime}
                       onChange={(event) => setStartTime(event.target.value)}
                       disabled={submitting}
@@ -297,6 +326,7 @@ export default function WorklogsDialog({
                     <input
                       type="time"
                       required
+                      step={60}
                       value={endTime}
                       onChange={(event) => setEndTime(event.target.value)}
                       disabled={submitting}
@@ -304,23 +334,14 @@ export default function WorklogsDialog({
                     />
                   </label>
                 </div>
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Time zone
-                  </span>
-                  <input
-                    type="text"
-                    required
-                    value={timeZone}
-                    onChange={(event) => setTimeZone(event.target.value)}
-                    disabled={submitting}
-                    placeholder="Asia/Kolkata"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                  <span className="mt-1 block text-xs text-slate-500">
-                    Enter a time zone such as Asia/Kolkata or America/New_York.
-                  </span>
-                </label>
+                {!validTimeRange && (
+                  <p className="text-sm text-red-600" role="alert">
+                    End time must be at least one hour after start time.
+                  </p>
+                )}
+                <p className="text-xs text-slate-500">
+                  Time zone: {WORKLOG_TIME_ZONE}
+                </p>
               </>
             ) : (
               <>
@@ -365,7 +386,7 @@ export default function WorklogsDialog({
                 disabled={
                   submitting ||
                   (mode === "initialize" || mode === "update"
-                    ? !timeZone.trim()
+                    ? !validTimeRange
                     : !worklogText.trim())
                 }
                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
